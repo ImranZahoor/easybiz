@@ -1,5 +1,5 @@
 """Tenant host URLs; auth/core/module routers mount in M4+."""
 
-from django.urls import path
+from django.urls import URLPattern
 
-urlpatterns: list[path] = []
+urlpatterns: list[URLPattern] = []

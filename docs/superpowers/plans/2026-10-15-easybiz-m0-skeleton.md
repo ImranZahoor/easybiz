@@ -712,7 +712,7 @@ Run:
 ```bash
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy easybiz
+uv run mypy easybiz config
 ```
 Expected: all clean. Fix any findings (format with `uv run ruff format .`) before committing.
 

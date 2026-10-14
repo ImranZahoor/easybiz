@@ -31,7 +31,7 @@ uv run manage.py check           # system checks must pass
 uv run manage.py check                        # Django system checks
 uv run pytest                                 # test suite (uses db "easybiz_test")
 uv run ruff check . && uv run ruff format --check .   # lint + format
-uv run mypy easybiz                           # type-check
+uv run mypy easybiz config                    # type-check
 uv run manage.py makemigrations --check --dry-run     # pending migrations (M1 onward)
 ```
 
