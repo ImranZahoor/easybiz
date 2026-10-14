@@ -1,4 +1,5 @@
 """Single settings module (§0.5). Env differences come from a .env file."""
+
 import os
 import sys
 from pathlib import Path
@@ -12,9 +13,7 @@ load_dotenv(BASE_DIR / ".env")
 
 RUNNING_PYTEST = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY", "dev-insecure-change-me-00000000000000000000"
-)
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-change-me-00000000000000000000")
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", ".localhost,127.0.0.1").split(",")
 

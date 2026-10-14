@@ -4,7 +4,7 @@ from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.db import models
 
 
-class UserManager(BaseUserManager):
+class UserManager(BaseUserManager["User"]):
     """Creates global users; email is normalised to lowercase."""
 
     def create_user(self, email: str, password: str | None = None, **extra):
@@ -30,7 +30,7 @@ class User(AbstractBaseUser):
     created_at = models.DateTimeField(auto_now_add=True)
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS: list[str] = []
+    REQUIRED_FIELDS = []
 
     objects = UserManager()
 
@@ -46,6 +46,4 @@ class Membership(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["user", "tenant"], name="uniq_membership")
-        ]
+        constraints = [models.UniqueConstraint(fields=["user", "tenant"], name="uniq_membership")]

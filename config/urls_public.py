@@ -1,4 +1,5 @@
 """Platform host URLs: health now; platform API mounts in M7."""
+
 from django.http import JsonResponse
 from django.urls import path
 
