@@ -30,7 +30,7 @@ SHARED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.staticfiles",
     "easybiz.core.tenancy",
-    "easybiz.core.accounts",
+    "easybiz.core.users",
     "easybiz.core.catalog",
     "ninja",
     "corsheaders",
@@ -80,7 +80,7 @@ TENANT_SYNC_ROUTER = "easybiz.core.kernel.routers.ModuleAwareTenantSyncRouter"
 TENANT_BASE_MIGRATE_COMMAND = "easybiz.core.kernel.migrate.Command"
 DATABASE_ROUTERS = ("easybiz.core.kernel.routers.ModuleAwareTenantSyncRouter",)
 
-AUTH_USER_MODEL = "accounts.User"
+AUTH_USER_MODEL = "users.User"
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
 
 STATIC_URL = "/static/"

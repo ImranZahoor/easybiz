@@ -1,7 +1,7 @@
 from django.apps import AppConfig
 
 
-class AccountsConfig(AppConfig):
+class UsersConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "easybiz.core.accounts"
-    label = "accounts"
+    name = "easybiz.core.users"
+    label = "users"
