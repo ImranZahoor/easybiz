@@ -1,0 +1,13 @@
+{
+  "id": "timesheets",
+  "name": "Timesheets",
+  "version": "0.1.0",
+  "requires": [],
+  "optional": [],
+  "provides": [],
+  "consumes": [],
+  "permissions": [],
+  "roles": [],
+  "events": {"publishes": [], "subscribes": []},
+  "menu": []
+}
