@@ -152,7 +152,7 @@ Any business logic: stock, invoices, payroll rules, leave policies and so on. Th
 
 ### 2.2 Schema layout
 
-- **`public` schema** (shared): `tenancy_tenant`, `tenancy_domain`, `tenancy_platformauditlog`, `accounts_user`, `accounts_membership`, `catalog_module`, `catalog_tenantmodule`, `catalog_permission`, `django_content_type`, `django_migrations`.
+- **`public` schema** (shared): `tenancy_tenant`, `tenancy_domain`, `tenancy_platformauditlog`, `users_user`, `users_membership`, `catalog_module`, `catalog_tenantmodule`, `catalog_permission`, `django_content_type`, `django_migrations`.
 - **Tenant schema `t_<slug>`**: core tables `iam_role`, `iam_rolepermission`, `iam_userrole`, `audit_auditlog`, `events_outboxevent`, `events_inboxprocessed`, plus the tables of **only those modules the tenant has enabled** (for example `timesheets_project`, `timesheets_entry`).
 - Tenant queries run with `search_path = t_<slug>, public`, so public tables remain reachable by name.
 
@@ -232,7 +232,7 @@ easybiz/
 │   ├── core/
 │   │   ├── contracts.py             (capability Protocols)
 │   │   ├── tenancy/    models: Tenant, Domain, PlatformAuditLog · audit.py
-│   │   ├── accounts/   models: User, Membership · service.py
+│   │   ├── users/      models: User, Membership · service.py
 │   │   ├── catalog/    models: Module, TenantModule, Permission
 │   │   ├── iam/        models: Role, RolePermission, UserRole · service.py
 │   │   ├── audit/      models: AuditLog · service.py
@@ -290,13 +290,13 @@ SHARED_APPS = [
     "easybiz.core.kernel",                # early so its runserver override beats staticfiles' (P1)
     "django.contrib.contenttypes",    # required by django-tenants
     "django.contrib.staticfiles",     # Swagger UI assets
-    "easybiz.core.tenancy", "easybiz.core.accounts", "easybiz.core.catalog",
+    "easybiz.core.tenancy", "easybiz.core.users", "easybiz.core.catalog",
     "ninja",                          # templates for /api/docs
     "corsheaders",
 ]
 TENANT_APPS = ["easybiz.core.iam", "easybiz.core.audit", "easybiz.core.events", *EASYBIZ_MODULE_PACKAGES]
 INSTALLED_APPS = list(SHARED_APPS) + [a for a in TENANT_APPS if a not in SHARED_APPS]
-AUTH_USER_MODEL = "accounts.User"      # custom user; django.contrib.auth is NOT installed
+AUTH_USER_MODEL = "users.User"      # custom user; django.contrib.auth is NOT installed
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
@@ -346,7 +346,7 @@ Types: `uuid` = UUID primary key (`uuid4`), `id` = `BigAutoField`. All timestamp
 
 **`tenancy_platformauditlog`**: `id` uuid, `at` indexed, `actor_id` uuid null, `actor_email` char(254), `action` char(100) indexed, `target` char(200), `detail` JSON null.
 
-**`accounts_user`** (`AbstractBaseUser`; `USERNAME_FIELD = email`)
+**`users_user`** (`AbstractBaseUser`; `USERNAME_FIELD = email`)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -359,7 +359,7 @@ Types: `uuid` = UUID primary key (`uuid4`), `id` = `BigAutoField`. All timestamp
 | is_platform_admin | bool | grants access to the platform API |
 | created_at | datetime | |
 
-**`accounts_membership`**: `id`, `user` FK (cascade), `tenant` FK (cascade, `related_name="memberships"`), `is_active`, `created_at`. Unique `(user, tenant)` named `uniq_membership`. One person may belong to many tenants.
+**`users_membership`**: `id`, `user` FK (cascade), `tenant` FK (cascade, `related_name="memberships"`), `is_active`, `created_at`. Unique `(user, tenant)` named `uniq_membership`. One person may belong to many tenants.
 
 **`catalog_module`**: `id` char(32) primary key (the module id), `name`, `version`, `manifest` JSON (the parsed manifest), `installed_at`, `updated_at`.
 
@@ -371,7 +371,7 @@ Types: `uuid` = UUID primary key (`uuid4`), `id` = `BigAutoField`. All timestamp
 
 **`iam_role`**: `id` uuid, `name` unique, `description`, `is_system` bool, `created_at`.
 **`iam_rolepermission`**: `id`, `role` FK (cascade, `related_name="permissions"`), `permission` char(100). Unique `(role, permission)` named `uniq_role_permission`. Value is an exact code, a group wildcard `module.*`, or `*`.
-**`iam_userrole`**: `id`, `user_id` uuid (indexed; points at `accounts_user` **by value**), `role` FK (cascade, `related_name="assignments"`). Unique `(user_id, role)` named `uniq_user_role`.
+**`iam_userrole`**: `id`, `user_id` uuid (indexed; points at `users_user` **by value**), `role` FK (cascade, `related_name="assignments"`). Unique `(user_id, role)` named `uniq_user_role`.
 
 **`audit_auditlog`**: `id` uuid, `at` indexed, `actor_id` uuid null, `action` char(100) indexed, `entity` char(100), `entity_id` char(100), `before` JSON null, `after` JSON null.
 
@@ -529,7 +529,7 @@ Other tenant operations (`kernel/tenants.py`): `suspend` / `resume` (409 if alre
 
 ### 6.2 Identity and authentication
 
-- **Users are global** (`accounts_user`); access to a tenant is a **membership**. Roles are per tenant.
+- **Users are global** (`users_user`); access to a tenant is a **membership**. Roles are per tenant.
 - **Password rule:** at least 10 characters when creating an account (`WeakPassword` gives 422). Hashing: PBKDF2 through `django.contrib.auth.hashers` (the auth app itself is not installed).
 - **Tenant login** `POST /api/auth/login`: valid credentials **and** an active membership of the host's tenant; otherwise 401 `Invalid credentials` (the same message for every failure).
 - **Tenant token** (HS256, `SECRET_KEY`): claims `sub` (user id), `tenant` (schema name), `iat`, `exp`. Validated by `TenantJWTAuth`: signature, expiry, `tenant == request.tenant.schema_name`, user active, membership active, then the endpoint permission (403 `Missing permission <code>`). Always returns 401 on the public host.
@@ -689,7 +689,7 @@ Each milestone ends with a verification the agent must run. Dev database: `docke
 **M3. Catalog, module-aware migrations, lifecycle, provisioning.** Models `Module`, `TenantModule`, `Permission`; tenant apps `iam`, `audit`, `events` (models only); `routers.py`, `migrate.py`; `lifecycle.py`; `provisioning.py`; commands `sync_modules`, `provision_tenant`, `tenant_module`, `upgrade_modules`; a minimal module so there is something to enable.
 *Verify (manual):* provision two tenants, enable the module for one: its tables exist in exactly that schema and nowhere else, not in `public`, and `django_migrations` of the other schema has no row for the module.
 
-**M4. AuthN, AuthZ, audit, tenant API.** `accounts/service.py`, `iam/service.py`, `audit/service.py`, `api/auth.py`, `api/core_routes.py`, both middlewares, docs and static setup.
+**M4. AuthN, AuthZ, audit, tenant API.** `users/service.py`, `iam/service.py`, `audit/service.py`, `api/auth.py`, `api/core_routes.py`, both middlewares, docs and static setup.
 *Verify:* login and `/me` work; `/api/docs` renders with CSS and JS; module gate returns 404 before enable and 200 after.
 
 **M5. Events.** `events/service.py`, `run_dispatcher`.
@@ -1037,10 +1037,10 @@ class EmployeeProvider(Protocol):
 
 **Design**
 
-1. **Short-lived access tokens plus rotating refresh tokens.** Access TTL 15 minutes. Public table `accounts_refreshtoken` (`id` uuid, `user` FK, `tenant` FK, `family` uuid, `token_hash` unique (SHA-256 of a 256-bit random value), `created_at`, `expires_at`, `revoked_at`, `replaced_by` null, `user_agent`, `ip`). Every refresh issues a new token and revokes the old one; **presenting an already-revoked token revokes the whole family** (theft detection). Endpoints: `POST /api/auth/refresh`, `POST /api/auth/logout` (revokes the family), `POST /api/auth/logout-all`, `GET /api/auth/sessions`, `DELETE /api/auth/sessions/{family}`.
+1. **Short-lived access tokens plus rotating refresh tokens.** Access TTL 15 minutes. Public table `users_refreshtoken` (`id` uuid, `user` FK, `tenant` FK, `family` uuid, `token_hash` unique (SHA-256 of a 256-bit random value), `created_at`, `expires_at`, `revoked_at`, `replaced_by` null, `user_agent`, `ip`). Every refresh issues a new token and revokes the old one; **presenting an already-revoked token revokes the whole family** (theft detection). Endpoints: `POST /api/auth/refresh`, `POST /api/auth/logout` (revokes the family), `POST /api/auth/logout-all`, `GET /api/auth/sessions`, `DELETE /api/auth/sessions/{family}`.
 2. **Password reset.** `POST /api/auth/password/forgot` always answers 202 (no account enumeration); `POST /api/auth/password/reset` consumes a single-use, hashed, 30-minute token, sets the password, revokes all sessions. Both throttled per IP and per email.
 3. **Invitations and email verification.** Tenant table `iam_invitation` (`id`, `email`, `roles` JSON, `token_hash`, `expires_at`, `accepted_at`, `invited_by`). `POST /api/core/invitations` (`core.user.manage`), `POST /api/auth/accept-invitation` (sets the password or joins an existing account). Replaces creating users with a password chosen by an admin (the current `POST /core/users` stays for service accounts and tests).
-4. **MFA (TOTP, RFC 6238).** Public tables `accounts_mfadevice` (`user`, `kind`, `secret` encrypted, `confirmed_at`) and `accounts_recoverycode` (hashed, single-use). When enabled, `POST /api/auth/login` returns `{"mfa_required": true, "mfa_token": "<short-lived>"}` and `POST /api/auth/mfa/verify` completes login. Tenant policy `core.security.require_mfa` is `off | admins | all`. Platform admins always need MFA.
+4. **MFA (TOTP, RFC 6238).** Public tables `users_mfadevice` (`user`, `kind`, `secret` encrypted, `confirmed_at`) and `users_recoverycode` (hashed, single-use). When enabled, `POST /api/auth/login` returns `{"mfa_required": true, "mfa_token": "<short-lived>"}` and `POST /api/auth/mfa/verify` completes login. Tenant policy `core.security.require_mfa` is `off | admins | all`. Platform admins always need MFA.
 5. **SSO (OIDC; SAML later).** Tenant settings hold providers (`issuer`, `client_id`, encrypted `client_secret`, scopes, allowed email domains, claim-to-role mapping, `jit_provisioning`, `enforce_sso`). Endpoints `GET /api/auth/sso/{provider}/start` and `/callback` use authorization-code flow with PKCE, `state` and `nonce`. A verified email claim maps to a global user; membership is created only when JIT or an invitation allows it.
 6. **API keys** (tenant table `iam_apikey`: `id`, `name`, `prefix` unique, `secret_hash`, `permissions` JSON, `expires_at`, `last_used_at`, `created_by`, `revoked_at`). Sent as `Authorization: ApiKey <prefix>.<secret>`. The secret is shown once and stored hashed; comparison is constant-time. Permissions must be a **subset of the creator's**. Keys act as a service principal in audit (`actor_id` = key id, flagged as service). Per-key rate limit. Endpoints `core.apikey.manage`.
 7. **Signing keys.** Move JWTs from HS256 to EdDSA or RS256 with `kid`; keep the previous public key valid for the token lifetime; publish `/.well-known/jwks.json` on the platform host. Add claims `jti`, `sid` (refresh family) and `amr` (authentication methods). Key rotation is a documented command.
