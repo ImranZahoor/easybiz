@@ -26,9 +26,10 @@ def _recreate_test_db() -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def platform():
-    """Fresh test DB with shared schema migrated. (init_platform added in M1 Task 3.)"""
+    """Fresh test DB with shared schema migrated and the public tenant seeded."""
     _recreate_test_db()
     call_command("migrate_schemas", "--shared", verbosity=0)
+    call_command("init_platform", "--domain", "localhost", verbosity=0)
     yield
 
 
