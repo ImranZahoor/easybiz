@@ -6,12 +6,17 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
-**M1 (tenancy & identity) — complete.** The tenancy/identity migrations are
-authored and applied to the `public` schema, `init_platform` seeds the public
-(platform) tenant and its `localhost` domain, and `/health` answers on the
-platform host. Tests run against real PostgreSQL. Next milestone **M3** adds the
-module catalog, per-tenant module lifecycle, and provisioning (and extends
-`init_platform` to sync the catalog).
+**M2 (kernel core) — complete.** Manifest parsing/validation, version-range
+semantics, the module registry (dependency graph, load order, handlers),
+discovery, and capability contracts (`AttendanceProvider`) are in place, and the
+registry loads + validates module manifests at Django startup. `state.py` and
+`capabilities.py` are deferred to **M3** (they depend on the module catalog).
+M1 remains: tenancy/identity migrations applied, `init_platform` seeds the
+public tenant + `localhost` domain, `/health` answers on the platform host.
+
+Next milestone **M3** adds the module catalog, module-aware migrations, the
+per-tenant lifecycle, provisioning, and `state.py`/`capabilities.py` (and
+extends `init_platform` to sync the catalog).
 
 ## Prerequisites
 
