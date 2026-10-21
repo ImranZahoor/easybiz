@@ -131,3 +131,57 @@ def test_optional_may_not_repeat_requires():
 def test_requires_range_defaults_to_wildcard():
     m = parse_manifest(_m(requires=[{"module": "a1"}]))
     assert m.requires == [("a1", "*")]
+
+
+# --- registry graph (Task 3) ------------------------------------------------
+
+from easybiz.core.kernel.registry import Registry, RegistryError  # noqa: E402
+
+
+def _reg(*manifests):
+    reg = Registry()
+    for data in manifests:
+        reg.add(parse_manifest(data))
+    return reg
+
+
+def test_load_order_dependencies_first():
+    reg = _reg(
+        {"id": "payroll", "version": "1.0.0", "requires": [{"module": "hr", "range": "^1"}]},
+        {"id": "hr", "version": "1.2.0"},
+    )
+    order = reg.load_order()
+    assert order.index("hr") < order.index("payroll")
+
+
+def test_missing_hard_dependency_fails_fast():
+    reg = _reg({"id": "payroll", "version": "1.0.0", "requires": [{"module": "hr"}]})
+    with pytest.raises(RegistryError, match="not installed"):
+        reg.load_order()
+
+
+def test_incompatible_dependency_version_fails():
+    reg = _reg(
+        {"id": "payroll", "version": "1.0.0", "requires": [{"module": "hr", "range": "^2"}]},
+        {"id": "hr", "version": "1.2.0"},
+    )
+    with pytest.raises(RegistryError, match="1.2.0"):
+        reg.load_order()
+
+
+def test_dependency_cycle_detected():
+    reg = _reg(
+        {"id": "aa", "version": "1.0.0", "requires": [{"module": "bb"}]},
+        {"id": "bb", "version": "1.0.0", "requires": [{"module": "aa"}]},
+    )
+    with pytest.raises(RegistryError, match="cycle"):
+        reg.load_order()
+
+
+def test_dependents_of():
+    reg = _reg(
+        {"id": "hr", "version": "1.0.0"},
+        {"id": "payroll", "version": "1.0.0", "requires": [{"module": "hr"}]},
+        {"id": "timesheets", "version": "1.0.0", "optional": [{"module": "hr"}]},
+    )
+    assert reg.dependents_of("hr") == ["payroll"]  # requires only, not optional
