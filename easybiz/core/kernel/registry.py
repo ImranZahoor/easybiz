@@ -67,11 +67,16 @@ class Registry:
 
     # --- runtime wiring ------------------------------------------------------
 
-    def module_id_for(self, dotted_name: str) -> str:
-        """Longest-prefix match of a dotted module path to a module id (`core` default)."""
+    def module_id_for(self, dotted_name: str) -> str | None:
+        """Longest-prefix match of a dotted path to a module id.
+
+        Returns ``"core"`` for ``easybiz.core*`` and the module id for a
+        registered package; ``None`` when the path matches nothing (so an
+        unknown module is never silently trusted as core).
+        """
         if dotted_name == "easybiz.core" or dotted_name.startswith("easybiz.core."):
             return "core"
-        best_id, best_len = "core", -1
+        best_id, best_len = None, -1
         for mid, m in self._manifests.items():
             pkg = m.package
             if pkg and (dotted_name == pkg or dotted_name.startswith(pkg + ".")):
@@ -82,6 +87,8 @@ class Registry:
     def add_handler(self, event: str, func) -> None:
         """Register an event handler; a non-core handler must declare the subscription."""
         module_id = self.module_id_for(func.__module__)
+        if module_id is None:
+            raise RegistryError(f"handler module {func.__module__!r} maps to no known module")
         if module_id != "core":
             manifest = self._manifests.get(module_id)
             if manifest is None or event not in manifest.subscribes:
@@ -106,7 +113,10 @@ class Registry:
             if spec is None or not spec.submodule_search_locations:
                 raise RegistryError(f"module package {package!r} not found")
             location = next(iter(spec.submodule_search_locations))
-            data = json.loads((Path(location) / "manifest.json").read_text())
+            try:
+                data = json.loads((Path(location) / "manifest.json").read_text())
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RegistryError(f"module {package!r} has no readable manifest.json") from exc
             self.add(parse_manifest(data, package=package))
         self.load_order()
 
@@ -123,7 +133,10 @@ class Registry:
         from django.apps import apps
 
         for mid, manifest in self._manifests.items():
-            app = apps.get_app_config(mid)
+            try:
+                app = apps.get_app_config(mid)
+            except LookupError as exc:
+                raise RegistryError(f"module {mid!r} has no Django app with label {mid!r}") from exc
             if app.name != manifest.package:
                 raise RegistryError(
                     f"app {mid!r} name {app.name!r} != package {manifest.package!r}"

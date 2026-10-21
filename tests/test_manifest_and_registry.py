@@ -227,3 +227,34 @@ def test_discovery_returns_explicit_packages():
     assert discover_module_packages(["easybiz.modules.timesheets"]) == [
         "easybiz.modules.timesheets"
     ]
+
+
+def test_module_id_for_unknown_returns_none():
+    assert Registry().module_id_for("some.random.thirdparty") is None
+
+
+def test_add_handler_rejects_unknown_module():
+    reg = Registry()
+
+    def handler(event):
+        return None
+
+    handler.__module__ = "some.random.thirdparty"
+    with pytest.raises(RegistryError, match="no known module"):
+        reg.add_handler("whatever.event", handler)
+
+
+def test_add_handler_allows_core_handler():
+    reg = Registry()
+
+    def handler(event):
+        return None
+
+    handler.__module__ = "easybiz.core.events.service"
+    reg.add_handler("core.module.enabled", handler)
+    assert reg._handlers["core.module.enabled"] == [handler]
+
+
+def test_permission_entry_missing_code_rejected():
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(permissions=[{"description": "no code"}]))

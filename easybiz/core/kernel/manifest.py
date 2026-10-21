@@ -131,10 +131,14 @@ def parse_manifest(data: dict, *, package: str | None = None) -> Manifest:
     if set(req_ids) & set(opt_ids):
         raise ManifestError("optional may not repeat a requires entry")
 
-    permissions = [(p["code"], p.get("description", "")) for p in data.get("permissions", [])]
-    for code, _ in permissions:
+    permissions: list[tuple[str, str]] = []
+    for p in data.get("permissions", []):
+        code = p.get("code")
+        if not code:
+            raise ManifestError("permission entry missing 'code'")
         if not code.startswith(f"{mid}."):
             raise ManifestError(f"permission {code!r} must start with {mid!r}.")
+        permissions.append((code, p.get("description", "")))
     declared = {code for code, _ in permissions}
 
     roles = data.get("roles", [])
