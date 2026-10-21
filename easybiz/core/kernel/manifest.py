@@ -94,7 +94,7 @@ class Manifest:
     package: str | None = None
 
 
-def _deps(raw: object, kind: str) -> list[Dep]:
+def _deps(raw: list[dict] | None, kind: str) -> list[Dep]:
     out: list[Dep] = []
     for entry in raw or []:
         module = entry.get("module")

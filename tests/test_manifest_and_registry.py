@@ -185,3 +185,45 @@ def test_dependents_of():
         {"id": "timesheets", "version": "1.0.0", "optional": [{"module": "hr"}]},
     )
     assert reg.dependents_of("hr") == ["payroll"]  # requires only, not optional
+
+
+# --- runtime wiring (Task 4) ------------------------------------------------
+
+
+def test_module_id_for_core_prefix():
+    reg = Registry()
+    assert reg.module_id_for("easybiz.core.kernel.apps") == "core"
+
+
+def test_module_id_for_longest_module_prefix():
+    reg = Registry()
+    reg.add(
+        parse_manifest(
+            {"id": "timesheets", "version": "0.1.0"}, package="easybiz.modules.timesheets"
+        )
+    )
+    assert reg.module_id_for("easybiz.modules.timesheets.handlers") == "timesheets"
+
+
+def test_add_handler_rejects_undeclared_subscription():
+    reg = Registry()
+    reg.add(
+        parse_manifest(
+            {"id": "timesheets", "version": "0.1.0"}, package="easybiz.modules.timesheets"
+        )
+    )
+
+    def handler(event):
+        return None
+
+    handler.__module__ = "easybiz.modules.timesheets.handlers"
+    with pytest.raises(RegistryError, match="not declared"):
+        reg.add_handler("timesheets.entry.approved", handler)
+
+
+def test_discovery_returns_explicit_packages():
+    from easybiz.core.kernel.discovery import discover_module_packages
+
+    assert discover_module_packages(["easybiz.modules.timesheets"]) == [
+        "easybiz.modules.timesheets"
+    ]
