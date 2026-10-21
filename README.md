@@ -6,10 +6,12 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
-**M0 (skeleton) — complete.** The project boots and `uv run manage.py check`
-passes. No migrations are authored yet and no endpoints are served beyond
-`/health` on the platform host. Next milestone **M1** authors the tenancy and
-identity migrations and the `init_platform` bootstrap.
+**M1 (tenancy & identity) — complete.** The tenancy/identity migrations are
+authored and applied to the `public` schema, `init_platform` seeds the public
+(platform) tenant and its `localhost` domain, and `/health` answers on the
+platform host. Tests run against real PostgreSQL. Next milestone **M3** adds the
+module catalog, per-tenant module lifecycle, and provisioning (and extends
+`init_platform` to sync the catalog).
 
 ## Prerequisites
 
@@ -19,10 +21,12 @@ identity migrations and the `init_platform` bootstrap.
 ## Setup
 
 ```bash
-docker compose up -d db          # PostgreSQL 16 on localhost:5432 (db "easybiz")
+docker compose up -d db          # PostgreSQL 16 on localhost:5432 (db "easybiz") — required for tests
 uv sync                          # install deps into .venv
 cp .env.example .env             # adjust secrets/hosts per environment
 uv run manage.py check           # system checks must pass
+uv run manage.py migrate_schemas --shared   # apply shared migrations to the public schema
+uv run manage.py init_platform              # create the public tenant + localhost domain
 ```
 
 ## Common commands
@@ -32,7 +36,7 @@ uv run manage.py check                        # Django system checks
 uv run pytest                                 # test suite (uses db "easybiz_test")
 uv run ruff check . && uv run ruff format --check .   # lint + format
 uv run mypy easybiz config                    # type-check
-uv run manage.py makemigrations --check --dry-run     # pending migrations (M1 onward)
+uv run manage.py makemigrations --check --dry-run     # verify no un-authored migrations
 ```
 
 ## Conventions
