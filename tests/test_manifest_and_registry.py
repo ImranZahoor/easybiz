@@ -49,3 +49,85 @@ def test_invalid_version_rejected():
         Version.parse("1.2.3.4")
     with pytest.raises(ManifestError):
         Version.parse("x")
+
+
+# --- manifest validation (Task 2) -------------------------------------------
+
+from easybiz.core.kernel.manifest import parse_manifest  # noqa: E402
+
+RESERVED = {"core", "auth", "platform", "admin", "docs", "openapi"}
+
+
+def _m(**over):
+    base = {"id": "hr", "version": "1.0.0"}
+    base.update(over)
+    return base
+
+
+def test_minimal_manifest_defaults_name_to_id():
+    m = parse_manifest(_m())
+    assert m.id == "hr" and m.name == "hr" and m.version == "1.0.0"
+
+
+def test_missing_id_rejected():
+    with pytest.raises(ManifestError):
+        parse_manifest({"version": "1.0.0"})
+
+
+@pytest.mark.parametrize("bad", ["A", "1hr", "a", "x" * 32, "hr-x"])
+def test_bad_id_rejected(bad):
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(id=bad))
+
+
+@pytest.mark.parametrize("rid", sorted(RESERVED))
+def test_reserved_id_rejected(rid):
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(id=rid))
+
+
+def test_bad_version_rejected():
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(version="1.2.3.4"))
+
+
+def test_permission_prefix_enforced():
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(permissions=[{"code": "other.read", "description": "x"}]))
+
+
+def test_event_prefix_enforced():
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(events={"publishes": ["other.thing.done"], "subscribes": []}))
+
+
+def test_role_permission_must_be_declared():
+    with pytest.raises(ManifestError):
+        parse_manifest(
+            _m(
+                permissions=[{"code": "hr.read", "description": "x"}],
+                roles=[{"name": "r", "description": "d", "permissions": ["hr.write"]}],
+            )
+        )
+
+
+def test_self_dependency_rejected():
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(requires=[{"module": "hr", "range": "*"}]))
+
+
+def test_duplicate_dependency_rejected():
+    with pytest.raises(ManifestError):
+        parse_manifest(
+            _m(requires=[{"module": "a1", "range": "*"}, {"module": "a1", "range": "^1"}])
+        )
+
+
+def test_optional_may_not_repeat_requires():
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(requires=[{"module": "a1"}], optional=[{"module": "a1"}]))
+
+
+def test_requires_range_defaults_to_wildcard():
+    m = parse_manifest(_m(requires=[{"module": "a1"}]))
+    assert m.requires == [("a1", "*")]
