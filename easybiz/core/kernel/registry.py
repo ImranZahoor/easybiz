@@ -32,10 +32,16 @@ class Registry:
 
     def dependents_of(self, module_id: str) -> list[str]:
         return sorted(
-            m.id for m in self._manifests.values() if module_id in {dep for dep, _ in m.requires}
+            m.id for m in self._manifests.values() if any(dep == module_id for dep, _ in m.requires)
         )
 
     def load_order(self) -> list[str]:
+        """Validate every requirement, then return ids in dependency-first order."""
+        self._assert_requirements()
+        return self._topological_order()
+
+    def _assert_requirements(self) -> None:
+        """Each `requires` target must be installed and satisfy its version range."""
         for m in self._manifests.values():
             for dep, rng in m.requires:
                 target = self._manifests.get(dep)
@@ -45,6 +51,9 @@ class Registry:
                     raise RegistryError(
                         f"module {m.id!r} requires {dep!r} {rng}, found {target.version}"
                     )
+
+    def _topological_order(self) -> list[str]:
+        """Depth-first topological sort; raises on a dependency cycle."""
         order: list[str] = []
         visiting: set[str] = set()
         done: set[str] = set()
@@ -145,10 +154,18 @@ class Registry:
     def import_module_code(self) -> None:
         """Import each module's handlers/providers, then check declared subscriptions."""
         for manifest in self._manifests.values():
-            for suffix in ("handlers", "providers"):
-                name = f"{manifest.package}.{suffix}"
-                if importlib.util.find_spec(name) is not None:
-                    importlib.import_module(name)
+            self._import_optional(f"{manifest.package}.handlers")
+            self._import_optional(f"{manifest.package}.providers")
+        self._assert_subscriptions_satisfied()
+
+    @staticmethod
+    def _import_optional(dotted_name: str) -> None:
+        """Import a module if it exists; a missing handlers/providers module is fine."""
+        if importlib.util.find_spec(dotted_name) is not None:
+            importlib.import_module(dotted_name)
+
+    def _assert_subscriptions_satisfied(self) -> None:
+        """Every declared subscription must have had a handler registered on import."""
         for manifest in self._manifests.values():
             for event in manifest.subscribes:
                 if not self._handlers.get(event):
