@@ -7,4 +7,9 @@ class KernelConfig(AppConfig):
     label = "kernel"
 
     def ready(self) -> None:
-        """Registry loading is wired in M2; no-op at M0."""
+        """Load and validate module manifests at startup (M2)."""
+        from easybiz.core.kernel.registry import registry
+
+        registry.ensure_loaded()
+        registry.verify_apps()
+        registry.import_module_code()
