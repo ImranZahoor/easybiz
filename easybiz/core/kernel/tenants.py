@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 
 from django.db import connection
 
@@ -28,17 +29,28 @@ class TenantValidationError(TenantError):
 
 
 def schema_name_for(slug: str) -> str:
+    """Map a tenant slug to its PostgreSQL schema name (``t_<slug>``, dashes → underscores)."""
     return "t_" + slug.replace("-", "_")
 
 
 def normalize_domain(domain: str) -> str:
+    """Lowercase and validate a bare host name (no scheme, port, path, or bad labels)."""
     d = (domain or "").strip().lower()
     if not d or "://" in d or "/" in d or ":" in d or " " in d:
+        raise TenantValidationError(f"invalid domain {domain!r}")
+    if len(d) > 253 or any(not re.fullmatch(r"[a-z0-9-]{1,63}", label) for label in d.split(".")):
         raise TenantValidationError(f"invalid domain {domain!r}")
     return d
 
 
-def validate_new_tenant(*, slug, domain, owner_email, owner_password, modules) -> str:
+def validate_new_tenant(
+    *,
+    slug: str,
+    domain: str,
+    owner_email: str,
+    owner_password: str | None,
+    modules: Iterable[str],
+) -> str:
     """Validate a provisioning request, creating nothing. Returns the normalized domain."""
     if not _SLUG_RE.match(slug):
         raise TenantValidationError(f"invalid slug {slug!r}")
@@ -74,6 +86,7 @@ def validate_new_tenant(*, slug, domain, owner_email, owner_password, modules) -
 
 
 def suspend(tenant) -> None:
+    """Mark a tenant inactive (409 if already suspended)."""
     if not tenant.is_active:
         raise TenantConflict("tenant is already suspended")
     tenant.is_active = False
@@ -81,6 +94,7 @@ def suspend(tenant) -> None:
 
 
 def resume(tenant) -> None:
+    """Mark a tenant active again (409 if already active)."""
     if tenant.is_active:
         raise TenantConflict("tenant is already active")
     tenant.is_active = True
@@ -88,6 +102,7 @@ def resume(tenant) -> None:
 
 
 def add_domain(tenant, domain, is_primary: bool = False) -> Domain:
+    """Attach a domain to a tenant (409 on duplicate); primary demotes the others."""
     d = normalize_domain(domain)
     if Domain.objects.filter(domain=d).exists():
         raise TenantConflict(f"domain {d!r} is already in use")
@@ -95,6 +110,7 @@ def add_domain(tenant, domain, is_primary: bool = False) -> Domain:
 
 
 def remove_domain(tenant, domain) -> None:
+    """Detach a domain; a tenant keeps at least one, and removing the primary promotes another."""
     d = normalize_domain(domain)
     row = Domain.objects.filter(tenant=tenant, domain=d).first()
     if row is None:
@@ -104,12 +120,13 @@ def remove_domain(tenant, domain) -> None:
     was_primary = row.is_primary
     row.delete()
     if was_primary:
-        promoted = tenant.domains.first()
+        promoted = tenant.domains.order_by("id").first()
         promoted.is_primary = True
         promoted.save(update_fields=["is_primary"])
 
 
 def delete_tenant(tenant, confirm_slug: str) -> None:
+    """Drop a suspended tenant's schema and row (confirm_slug must match); users are kept."""
     if tenant.is_active:
         raise TenantConflict("tenant must be suspended before deletion")
     if confirm_slug != tenant.slug:

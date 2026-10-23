@@ -33,7 +33,17 @@ def test_reserved_slug_rejected(rid):
 
 
 @pytest.mark.parametrize(
-    "bad", ["https://acme.localhost", "acme.localhost:8000", "acme.localhost/x"]
+    "bad",
+    [
+        "https://acme.localhost",
+        "acme.localhost:8000",
+        "acme.localhost/x",
+        "a..b.com",
+        ".acme.com",
+        "acme.com.",
+        "café.com",
+        "x" * 254 + ".com",
+    ],
 )
 def test_bad_domain_rejected(bad):
     with pytest.raises(TenantValidationError):

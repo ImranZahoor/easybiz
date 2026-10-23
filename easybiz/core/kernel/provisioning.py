@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from uuid import UUID
+
 from django.db import connection, transaction
 from django_tenants.utils import tenant_context
 
@@ -15,7 +18,13 @@ from easybiz.core.users.models import Membership, User
 
 
 def provision_tenant(
-    name, slug, domain, owner_email, owner_password=None, modules=(), actor_id=None
+    name: str,
+    slug: str,
+    domain: str,
+    owner_email: str,
+    owner_password: str | None = None,
+    modules: Iterable[str] = (),
+    actor_id: UUID | None = None,
 ) -> Tenant:
     """Create a tenant end to end, or roll everything back on any failure (I14)."""
     domain_norm = validate_new_tenant(

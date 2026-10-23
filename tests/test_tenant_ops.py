@@ -34,6 +34,15 @@ def test_remove_domain_keeps_at_least_one_and_promotes(synced, provision):
         tenants.remove_domain(tenant, "acme.example")  # last one
 
 
+def test_remove_primary_promotes_deterministically(synced, provision):
+    tenant = provision(slug="acme")  # acme.localhost is primary, lowest id
+    tenants.add_domain(tenant, "b.example")
+    tenants.add_domain(tenant, "c.example")
+    tenants.remove_domain(tenant, "acme.localhost")
+    primary = Domain.objects.get(tenant=tenant, is_primary=True)
+    assert primary.domain == "b.example"  # lowest remaining id
+
+
 def test_delete_requires_suspended_and_confirmation(synced, provision):
     tenant = provision(slug="acme")
     with pytest.raises(TenantConflict):
