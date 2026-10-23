@@ -30,6 +30,9 @@ class Registry:
     def manifest(self, module_id: str) -> Manifest | None:
         return self._manifests.get(module_id)
 
+    def module_ids(self) -> list[str]:
+        return list(self._manifests)
+
     def dependents_of(self, module_id: str) -> list[str]:
         return sorted(
             m.id for m in self._manifests.values() if any(dep == module_id for dep, _ in m.requires)

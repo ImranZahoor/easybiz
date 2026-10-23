@@ -41,6 +41,17 @@ def _reset_schema():
     connection.set_schema_to_public()
 
 
+@pytest.fixture(autouse=True)
+def _reset_capabilities():
+    """Isolate the process-global capability registry between tests."""
+    from easybiz.core.kernel import capabilities
+
+    saved = dict(capabilities._providers)
+    yield
+    capabilities._providers.clear()
+    capabilities._providers.update(saved)
+
+
 @pytest.fixture
 def tables_in():
     def _tables_in(schema: str) -> set[str]:
@@ -49,3 +60,26 @@ def tables_in():
             return {row[0] for row in cur.fetchall()}
 
     return _tables_in
+
+
+@pytest.fixture
+def db_tenant():
+    """A throwaway tenant schema (t_state) with core tenant apps migrated."""
+    from easybiz.core.tenancy.models import Domain, Tenant
+
+    tenant = Tenant(schema_name="t_state", slug="state", name="State")
+    tenant.save()  # auto_create_schema migrates core tenant apps into t_state
+    Domain.objects.create(domain="state.localhost", tenant=tenant, is_primary=True)
+    connection.set_schema_to_public()
+    yield tenant
+    with connection.cursor() as cur:
+        cur.execute('DROP SCHEMA IF EXISTS "t_state" CASCADE')
+    Tenant.objects.filter(schema_name="t_state").delete()
+
+
+@pytest.fixture
+def synced():
+    """Populate the catalog from the modules on disk."""
+    from easybiz.core.kernel import lifecycle
+
+    lifecycle.sync_catalog()

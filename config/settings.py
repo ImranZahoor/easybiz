@@ -21,7 +21,13 @@ if not DEBUG and SECRET_KEY.startswith("dev-insecure"):
     raise RuntimeError("DJANGO_SECRET_KEY must be set in production")
 
 EASYBIZ_MODULE_PACKAGES = discover_module_packages(
-    [p for p in os.environ.get("EASYBIZ_MODULES", "easybiz.modules.timesheets").split(",") if p]
+    [
+        p
+        for p in os.environ.get(
+            "EASYBIZ_MODULES", "easybiz.modules.timesheets,easybiz.modules.demo"
+        ).split(",")
+        if p
+    ]
 )
 
 SHARED_APPS = [

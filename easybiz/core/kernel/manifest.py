@@ -93,6 +93,23 @@ class Manifest:
     menu: list[dict] = field(default_factory=list)
     package: str | None = None
 
+    def to_dict(self) -> dict:
+        """Serialise back to a plain JSON-storable manifest dict (for the catalog)."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "version": self.version,
+            "requires": [list(d) for d in self.requires],
+            "optional": [list(d) for d in self.optional],
+            "provides": self.provides,
+            "consumes": self.consumes,
+            "permissions": [list(p) for p in self.permissions],
+            "roles": self.roles,
+            "publishes": self.publishes,
+            "subscribes": self.subscribes,
+            "menu": self.menu,
+        }
+
 
 def _deps(raw: list[dict] | None, kind: str) -> list[Dep]:
     out: list[Dep] = []
@@ -143,6 +160,8 @@ def parse_manifest(data: dict, *, package: str | None = None) -> Manifest:
 
     roles = data.get("roles", [])
     for role in roles:
+        if not role.get("name"):
+            raise ManifestError("role entry missing 'name'")
         for perm in role.get("permissions", []):
             if perm not in declared:
                 raise ManifestError(

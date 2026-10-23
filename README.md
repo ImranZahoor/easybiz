@@ -6,17 +6,20 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
-**M2 (kernel core) — complete.** Manifest parsing/validation, version-range
-semantics, the module registry (dependency graph, load order, handlers),
-discovery, and capability contracts (`AttendanceProvider`) are in place, and the
-registry loads + validates module manifests at Django startup. `state.py` and
-`capabilities.py` are deferred to **M3** (they depend on the module catalog).
-M1 remains: tenancy/identity migrations applied, `init_platform` seeds the
-public tenant + `localhost` domain, `/health` answers on the platform host.
+**M3a (module system core) — complete.** The module catalog (`catalog_*`) and the
+`iam`/`audit`/`events` models exist; the module-aware migration mechanism creates
+a module's tables in a tenant schema **only when enabled** (router + per-schema
+migrate); `state.py` reports enabled modules; `lifecycle.py` enables/disables/
+removes/upgrades modules (seeding roles, writing audit + outbox rows directly to
+the models — services arrive M4/M5); `capabilities.py` resolves a contract only
+while its provider is enabled; a minimal `demo` module is the enable target; the
+`sync_modules`/`tenant_module` commands work; and `init_platform` now syncs the
+catalog.
 
-Next milestone **M3** adds the module catalog, module-aware migrations, the
-per-tenant lifecycle, provisioning, and `state.py`/`capabilities.py` (and
-extends `init_platform` to sync the catalog).
+Next: **M3b** — provisioning (`provision_tenant`, all-or-nothing) + tenant ops
+(suspend/resume, domains, delete) + the `provision_tenant`/`upgrade_modules` CLI.
+Until then, tenants are created directly (as the tests do). Role inheritance is
+deferred to F14 (core roles are flat + wildcards).
 
 ## Prerequisites
 

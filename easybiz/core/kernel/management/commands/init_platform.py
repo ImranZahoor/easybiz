@@ -23,6 +23,11 @@ class Command(BaseCommand):
             tenant=tenant,
             defaults={"is_primary": True},
         )
+
+        from easybiz.core.kernel import lifecycle
+
+        lifecycle.sync_catalog()
         self.stdout.write(
-            f"public tenant {'created' if created else 'exists'}; domain {options['domain']}"
+            f"public tenant {'created' if created else 'exists'}; "
+            f"domain {options['domain']}; catalog synced"
         )
