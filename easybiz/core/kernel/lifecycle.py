@@ -47,7 +47,7 @@ def install_module(module_id: str) -> None:
             defaults={
                 "name": manifest.name,
                 "version": manifest.version,
-                "manifest": _as_dict(manifest),
+                "manifest": manifest.to_dict(),
             },
         )
         declared = {code for code, _ in manifest.permissions}
@@ -183,23 +183,6 @@ def requeue_parked(module_id: str) -> int:
 
 
 # --- helpers -----------------------------------------------------------------
-
-
-def _as_dict(manifest) -> dict:
-    return {
-        "id": manifest.id,
-        "name": manifest.name,
-        "version": manifest.version,
-        "requires": [list(d) for d in manifest.requires],
-        "optional": [list(d) for d in manifest.optional],
-        "provides": manifest.provides,
-        "consumes": manifest.consumes,
-        "permissions": [list(p) for p in manifest.permissions],
-        "roles": manifest.roles,
-        "publishes": manifest.publishes,
-        "subscribes": manifest.subscribes,
-        "menu": manifest.menu,
-    }
 
 
 def _assert_requirements_enabled(tenant, manifest) -> None:
