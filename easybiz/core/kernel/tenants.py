@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from django.db import connection
+
 from easybiz.core.catalog.models import Module
 from easybiz.core.kernel.registry import registry
 from easybiz.core.tenancy.models import Domain, Tenant
@@ -69,3 +71,51 @@ def validate_new_tenant(*, slug, domain, owner_email, owner_password, modules) -
                         f"module {mid!r} requires {dep!r} in the same request"
                     )
     return domain_norm
+
+
+def suspend(tenant) -> None:
+    if not tenant.is_active:
+        raise TenantConflict("tenant is already suspended")
+    tenant.is_active = False
+    tenant.save(update_fields=["is_active"])
+
+
+def resume(tenant) -> None:
+    if tenant.is_active:
+        raise TenantConflict("tenant is already active")
+    tenant.is_active = True
+    tenant.save(update_fields=["is_active"])
+
+
+def add_domain(tenant, domain, is_primary: bool = False) -> Domain:
+    d = normalize_domain(domain)
+    if Domain.objects.filter(domain=d).exists():
+        raise TenantConflict(f"domain {d!r} is already in use")
+    return Domain.objects.create(domain=d, tenant=tenant, is_primary=is_primary)
+
+
+def remove_domain(tenant, domain) -> None:
+    d = normalize_domain(domain)
+    row = Domain.objects.filter(tenant=tenant, domain=d).first()
+    if row is None:
+        raise TenantValidationError(f"{d!r} is not a domain of this tenant")
+    if tenant.domains.count() <= 1:
+        raise TenantConflict("a tenant must keep at least one domain")
+    was_primary = row.is_primary
+    row.delete()
+    if was_primary:
+        promoted = tenant.domains.first()
+        promoted.is_primary = True
+        promoted.save(update_fields=["is_primary"])
+
+
+def delete_tenant(tenant, confirm_slug: str) -> None:
+    if tenant.is_active:
+        raise TenantConflict("tenant must be suspended before deletion")
+    if confirm_slug != tenant.slug:
+        raise TenantValidationError("confirm_slug does not match the tenant slug")
+    schema = tenant.schema_name
+    connection.set_schema_to_public()  # type: ignore[attr-defined]  # django-tenants method
+    with connection.cursor() as cur:
+        cur.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+    tenant.delete()  # people (users) are kept; memberships cascade
