@@ -1066,6 +1066,7 @@ class EmployeeProvider(Protocol):
 
 **Purpose:** complete role administration and add attribute-based rules ("approve only if the amount is within your limit and the record is in your branch").
 **Depends on:** F3 for org scoping (can start without it).
+**Deferred decision (from M3a):** the core keeps **flat** access-control roles (a set of permission codes plus `module.*`/`*` wildcards); **role-inherits-role** was intentionally left out of the core and is to be evaluated here. If added, keep behaviour identical for roles without a parent and resolve a role's codes as the union with its ancestors' (with a cycle guard); it is an additive migration (a nullable self-reference or an `includes` table) over the M3a `iam_role` schema.
 
 **Design**
 
