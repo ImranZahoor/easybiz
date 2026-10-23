@@ -6,20 +6,19 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
-**M3a (module system core) — complete.** The module catalog (`catalog_*`) and the
-`iam`/`audit`/`events` models exist; the module-aware migration mechanism creates
-a module's tables in a tenant schema **only when enabled** (router + per-schema
-migrate); `state.py` reports enabled modules; `lifecycle.py` enables/disables/
-removes/upgrades modules (seeding roles, writing audit + outbox rows directly to
-the models — services arrive M4/M5); `capabilities.py` resolves a contract only
-while its provider is enabled; a minimal `demo` module is the enable target; the
-`sync_modules`/`tenant_module` commands work; and `init_platform` now syncs the
-catalog.
+**M3 (module system + provisioning) — complete.** Module catalog + `iam`/`audit`/
+`events` models; the module-aware migration mechanism (a module's tables exist in
+a tenant schema **only when enabled**); `state.py`, `lifecycle.py` (enable/disable/
+remove/upgrade), `capabilities.py`, and a minimal `demo` module (M3a). Plus
+**provisioning**: `provision_tenant` creates a tenant end to end (schema, primary
+domain, owner user + membership, `owner` role, enabled modules) as an
+all-or-nothing operation, with tenant ops (suspend/resume, add/remove domain,
+delete) and the `provision_tenant`/`upgrade_modules` CLI (M3b).
 
-Next: **M3b** — provisioning (`provision_tenant`, all-or-nothing) + tenant ops
-(suspend/resume, domains, delete) + the `provision_tenant`/`upgrade_modules` CLI.
-Until then, tenants are created directly (as the tests do). Role inheritance is
-deferred to F14 (core roles are flat + wildcards).
+Next: **M4** — authentication (JWT) and authorization services (`users/service.py`,
+`iam/service.py`, `audit/service.py`), the tenant API (`/api/auth`, `/api/core`),
+and activation of the tenant-status + module-gate middleware. Role inheritance
+remains deferred to F14 (core roles are flat + wildcards).
 
 ## Prerequisites
 
@@ -45,6 +44,12 @@ uv run pytest                                 # test suite (uses db "easybiz_tes
 uv run ruff check . && uv run ruff format --check .   # lint + format
 uv run mypy easybiz config                    # type-check
 uv run manage.py makemigrations --check --dry-run     # verify no un-authored migrations
+
+uv run manage.py sync_modules                 # record on-disk modules in the catalog
+uv run manage.py provision_tenant acme --domain acme.localhost \
+    --owner-email owner@acme.test --owner-password change-me-now --modules demo
+uv run manage.py tenant_module acme enable demo       # per-tenant enable/disable/remove
+uv run manage.py upgrade_modules              # after deploying new module code
 ```
 
 ## Conventions

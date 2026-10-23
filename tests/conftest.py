@@ -83,3 +83,37 @@ def synced():
     from easybiz.core.kernel import lifecycle
 
     lifecycle.sync_catalog()
+
+
+@pytest.fixture
+def provision():
+    """Provision tenants and drop their schemas + owner users afterwards."""
+    created: list[tuple[str, str]] = []  # (schema_name, owner_email)
+
+    def _provision(slug="acme", modules=(), **over):
+        from easybiz.core.kernel import provisioning
+
+        params = {
+            "name": slug.title(),
+            "slug": slug,
+            "domain": f"{slug}.localhost",
+            "owner_email": f"owner@{slug}.test",
+            "owner_password": "change-me-now",
+            "modules": modules,
+        }
+        params.update(over)
+        tenant = provisioning.provision_tenant(**params)
+        created.append((tenant.schema_name, params["owner_email"]))
+        return tenant
+
+    yield _provision
+
+    from easybiz.core.tenancy.models import Tenant
+    from easybiz.core.users.models import User
+
+    connection.set_schema_to_public()
+    for schema, email in created:
+        with connection.cursor() as cur:
+            cur.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        Tenant.objects.filter(schema_name=schema).delete()
+        User.objects.filter(email=email).delete()
