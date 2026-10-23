@@ -26,6 +26,4 @@ class UserRole(models.Model):
     role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name="assignments")
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["user_id", "role"], name="uniq_user_role")
-        ]
+        constraints = [models.UniqueConstraint(fields=["user_id", "role"], name="uniq_user_role")]
