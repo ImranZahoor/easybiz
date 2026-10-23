@@ -143,6 +143,8 @@ def parse_manifest(data: dict, *, package: str | None = None) -> Manifest:
 
     roles = data.get("roles", [])
     for role in roles:
+        if not role.get("name"):
+            raise ManifestError("role entry missing 'name'")
         for perm in role.get("permissions", []):
             if perm not in declared:
                 raise ManifestError(

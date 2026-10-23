@@ -89,21 +89,30 @@ def enable_module(tenant, module_id: str, actor_id=None) -> None:
                 row.save(update_fields=["status"])
             raise LifecycleError(f"migrations for {module_id!r} failed: {exc}") from exc
 
-    with tenant_context(tenant), transaction.atomic():
-        _seed_roles(manifest)
-        requeue_parked(module_id)
-        AuditLog.objects.create(
-            actor_id=actor_id,
-            action="module.enabled",
-            entity="module",
-            entity_id=module_id,
-            after={"version": manifest.version},
+    try:
+        with tenant_context(tenant), transaction.atomic():
+            _seed_roles(manifest)
+            requeue_parked(module_id)
+            AuditLog.objects.create(
+                actor_id=actor_id,
+                action="module.enabled",
+                entity="module",
+                entity_id=module_id,
+                after={"version": manifest.version},
+            )
+            OutboxEvent.objects.create(
+                name="core.module.enabled",
+                producer="core",
+                payload={"module": module_id, "version": manifest.version},
+            )
+    except Exception as exc:
+        # tables are migrated but seeding failed: leave the row DISABLED (tables
+        # exist, not enabled) rather than stuck in ENABLING, and honour the
+        # LifecycleError contract.
+        TenantModule.objects.filter(tenant=tenant, module_id=module_id).update(
+            status=TenantModule.DISABLED
         )
-        OutboxEvent.objects.create(
-            name="core.module.enabled",
-            producer="core",
-            payload={"module": module_id, "version": manifest.version},
-        )
+        raise LifecycleError(f"enabling {module_id!r} failed after migration: {exc}") from exc
     TenantModule.objects.filter(tenant=tenant, module_id=module_id).update(
         status=TenantModule.ENABLED,
         installed_version=manifest.version,
@@ -154,7 +163,8 @@ def remove_module_data(tenant, module_id: str, actor_id=None, policy: str = "dro
 def upgrade_modules() -> list[str]:
     order = sync_catalog()
     call_command("migrate_schemas", verbosity=0)
-    for row in TenantModule.objects.all():
+    # Only enabled rows had their tables migrated to the new version.
+    for row in TenantModule.objects.filter(status=TenantModule.ENABLED):
         manifest = registry.manifest(row.module_id)
         if manifest:
             TenantModule.objects.filter(pk=row.pk).update(installed_version=manifest.version)
@@ -214,11 +224,17 @@ def _dependents_with_row(tenant, module_id: str) -> set[str]:
 
 
 def _seed_roles(manifest) -> None:
+    """Ensure each manifest role exists with its declared permissions present.
+
+    Existing roles are not clobbered (tenant customisations kept), but the
+    module's own declared permissions are (re)asserted so a
+    remove-data -> re-enable cycle restores them. The overwrite policy for
+    customised roles is revisited in F14.
+    """
     for role in manifest.roles:
-        obj, created = Role.objects.get_or_create(
+        obj, _ = Role.objects.get_or_create(
             name=role["name"],
             defaults={"description": role.get("description", ""), "is_system": False},
         )
-        if created:
-            for perm in role.get("permissions", []):
-                RolePermission.objects.create(role=obj, permission=perm)
+        for perm in role.get("permissions", []):
+            RolePermission.objects.get_or_create(role=obj, permission=perm)

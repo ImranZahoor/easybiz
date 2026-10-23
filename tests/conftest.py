@@ -41,6 +41,17 @@ def _reset_schema():
     connection.set_schema_to_public()
 
 
+@pytest.fixture(autouse=True)
+def _reset_capabilities():
+    """Isolate the process-global capability registry between tests."""
+    from easybiz.core.kernel import capabilities
+
+    saved = dict(capabilities._providers)
+    yield
+    capabilities._providers.clear()
+    capabilities._providers.update(saved)
+
+
 @pytest.fixture
 def tables_in():
     def _tables_in(schema: str) -> set[str]:

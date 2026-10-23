@@ -111,6 +111,11 @@ def test_role_permission_must_be_declared():
         )
 
 
+def test_role_missing_name_rejected():
+    with pytest.raises(ManifestError):
+        parse_manifest(_m(roles=[{"description": "no name", "permissions": []}]))
+
+
 def test_self_dependency_rejected():
     with pytest.raises(ManifestError):
         parse_manifest(_m(requires=[{"module": "hr", "range": "*"}]))

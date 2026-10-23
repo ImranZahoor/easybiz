@@ -48,3 +48,25 @@ def test_remove_requires_disable_then_drops_tables(synced, db_tenant, tables_in)
     lifecycle.remove_module_data(db_tenant, "demo")
     assert "demo_widget" not in tables_in(db_tenant.schema_name)
     assert not TenantModule.objects.filter(tenant=db_tenant, module_id="demo").exists()
+
+
+def test_remove_then_reenable_restores_role_permissions(synced, db_tenant):
+    lifecycle.enable_module(db_tenant, "demo")
+    lifecycle.disable_module(db_tenant, "demo")
+    lifecycle.remove_module_data(db_tenant, "demo")
+    lifecycle.enable_module(db_tenant, "demo")
+    with tenant_context(db_tenant):
+        role = Role.objects.get(name="demo_viewer")
+        assert role.permissions.filter(permission="demo.widget.read").exists()
+
+
+def _boom(*args, **kwargs):
+    raise RuntimeError("boom")
+
+
+def test_enable_rolls_back_on_post_migrate_failure(synced, db_tenant, monkeypatch):
+    monkeypatch.setattr(lifecycle, "_seed_roles", _boom)
+    with pytest.raises(lifecycle.LifecycleError):
+        lifecycle.enable_module(db_tenant, "demo")
+    row = TenantModule.objects.filter(tenant=db_tenant, module_id="demo").first()
+    assert row is None or row.status != TenantModule.ENABLING  # not stuck mid-flight
