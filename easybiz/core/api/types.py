@@ -36,3 +36,17 @@ class ModuleOut(Schema):
     requires: list[str]
     optional: list[str]
     blocked_by: list[str]
+
+
+class RoleIn(Schema):
+    name: str
+    description: str = ""
+    permissions: list[str]
+
+
+class RoleOut(Schema):
+    id: str
+    name: str
+    description: str
+    is_system: bool
+    permissions: list[str]

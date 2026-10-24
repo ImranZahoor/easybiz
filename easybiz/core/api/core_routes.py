@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from ninja import Router
 from ninja.errors import HttpError
+from ninja.responses import Status
 
 from easybiz.core.api.auth import perm
-from easybiz.core.api.types import ModuleOut
+from easybiz.core.api.types import ModuleOut, RoleIn, RoleOut
+from easybiz.core.audit import service as audit
 from easybiz.core.catalog.models import TenantModule
+from easybiz.core.iam import service as iam
+from easybiz.core.iam.models import Role
 from easybiz.core.kernel import lifecycle, state
 from easybiz.core.kernel.registry import registry
 
@@ -74,3 +78,28 @@ def remove_data(request, module_id: str, confirm: bool = False):
     except lifecycle.LifecycleError as exc:
         raise HttpError(409, str(exc)) from exc
     return _module_view(request.tenant, module_id)
+
+
+def _role_view(role) -> RoleOut:
+    return RoleOut(
+        id=str(role.id),
+        name=role.name,
+        description=role.description,
+        is_system=role.is_system,
+        permissions=iam.role_permissions(role),
+    )
+
+
+@router.get("/roles", auth=perm("core.role.read"), response=list[RoleOut])
+def list_roles(request):
+    return [_role_view(r) for r in Role.objects.order_by("name")]
+
+
+@router.post("/roles", auth=perm("core.role.manage"), response={201: RoleOut})
+def create_role(request, data: RoleIn):
+    try:
+        role = iam.create_role(request.tenant, data.name, data.permissions, data.description)
+    except iam.RoleError as exc:
+        raise HttpError(422, str(exc)) from exc
+    audit.record(request.auth.id, "role.created", entity="role", entity_id=str(role.id))
+    return Status(201, _role_view(role))
