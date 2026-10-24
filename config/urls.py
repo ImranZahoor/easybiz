@@ -1,5 +1,7 @@
-"""Tenant host URLs; auth/core/module routers mount in M4+."""
+"""Tenant host URLs."""
 
-from django.urls import URLPattern
+from django.urls import path
 
-urlpatterns: list[URLPattern] = []
+from easybiz.core.api import api
+
+urlpatterns = [path("api/", api.urls)]
