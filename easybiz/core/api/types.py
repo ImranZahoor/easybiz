@@ -50,3 +50,16 @@ class RoleOut(Schema):
     description: str
     is_system: bool
     permissions: list[str]
+
+
+class UserIn(Schema):
+    email: str
+    password: str | None = None
+    name: str = ""
+    roles: list[str] = []
+
+
+class UserOut(Schema):
+    id: str
+    email: str
+    roles: list[str]

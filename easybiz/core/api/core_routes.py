@@ -7,13 +7,16 @@ from ninja.errors import HttpError
 from ninja.responses import Status
 
 from easybiz.core.api.auth import perm
-from easybiz.core.api.types import ModuleOut, RoleIn, RoleOut
+from easybiz.core.api.types import ModuleOut, RoleIn, RoleOut, UserIn, UserOut
 from easybiz.core.audit import service as audit
 from easybiz.core.catalog.models import TenantModule
+from easybiz.core.events.models import OutboxEvent
 from easybiz.core.iam import service as iam
-from easybiz.core.iam.models import Role
+from easybiz.core.iam.models import Role, UserRole
 from easybiz.core.kernel import lifecycle, state
 from easybiz.core.kernel.registry import registry
+from easybiz.core.users import service as users
+from easybiz.core.users.models import Membership
 
 router = Router()
 
@@ -103,3 +106,43 @@ def create_role(request, data: RoleIn):
         raise HttpError(422, str(exc)) from exc
     audit.record(request.auth.id, "role.created", entity="role", entity_id=str(role.id))
     return Status(201, _role_view(role))
+
+
+def _user_view(user) -> UserOut:
+    role_names = UserRole.objects.filter(user_id=user.id).values_list("role__name", flat=True)
+    return UserOut(id=str(user.id), email=user.email, roles=sorted(role_names))
+
+
+@router.get("/users", auth=perm("core.user.read"), response=list[UserOut])
+def list_users(request):
+    members = Membership.objects.filter(tenant=request.tenant, is_active=True).select_related(
+        "user"
+    )
+    return [_user_view(m.user) for m in members]
+
+
+@router.post("/users", auth=perm("core.user.manage"), response={201: UserOut})
+def create_user(request, data: UserIn):
+    try:
+        user = users.create_user(data.email, request.tenant, password=data.password, name=data.name)
+        iam.set_user_roles(user.id, data.roles)
+    except (users.WeakPassword, iam.RoleError) as exc:
+        raise HttpError(422, str(exc)) from exc
+    audit.record(request.auth.id, "user.added", entity="user", entity_id=str(user.id))
+    return Status(201, _user_view(user))
+
+
+@router.delete("/users/{user_id}", auth=perm("core.user.manage"), response={204: None})
+def delete_user(request, user_id: str):
+    if str(request.auth.id) == user_id:
+        raise HttpError(409, "you cannot remove yourself")
+    membership = Membership.objects.filter(tenant=request.tenant, user_id=user_id).first()
+    if membership is None:
+        raise HttpError(404, "user is not a member of this tenant")
+    UserRole.objects.filter(user_id=user_id).delete()
+    membership.delete()
+    OutboxEvent.objects.create(
+        name="core.membership.removed", producer="core", payload={"user_id": user_id}
+    )
+    audit.record(request.auth.id, "user.removed", entity="user", entity_id=user_id)
+    return Status(204, None)
