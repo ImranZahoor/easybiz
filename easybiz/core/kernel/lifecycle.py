@@ -9,7 +9,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 from django_tenants.utils import get_public_schema_name, tenant_context
 
-from easybiz.core.audit.models import AuditLog
+from easybiz.core.audit import service as audit
 from easybiz.core.catalog.models import Module, Permission, TenantModule
 from easybiz.core.events.models import OutboxEvent
 from easybiz.core.iam.models import Role, RolePermission
@@ -99,9 +99,9 @@ def enable_module(tenant, module_id: str, actor_id=None) -> None:
         with tenant_context(tenant), transaction.atomic():
             _seed_roles(manifest)
             requeue_parked(module_id)
-            AuditLog.objects.create(
-                actor_id=actor_id,
-                action="module.enabled",
+            audit.record(
+                actor_id,
+                "module.enabled",
                 entity="module",
                 entity_id=module_id,
                 after={"version": manifest.version},
@@ -136,9 +136,7 @@ def disable_module(tenant, module_id: str, actor_id=None) -> None:
         status=TenantModule.DISABLED
     )
     with tenant_context(tenant), transaction.atomic():
-        AuditLog.objects.create(
-            actor_id=actor_id, action="module.disabled", entity="module", entity_id=module_id
-        )
+        audit.record(actor_id, "module.disabled", entity="module", entity_id=module_id)
         OutboxEvent.objects.create(
             name="core.module.disabled", producer="core", payload={"module": module_id}
         )
@@ -160,9 +158,7 @@ def remove_module_data(tenant, module_id: str, actor_id=None, policy: str = "dro
     codes = {code for code, _ in manifest.permissions} if manifest else set()
     with tenant_context(tenant), transaction.atomic():
         RolePermission.objects.filter(permission__in=codes).delete()
-        AuditLog.objects.create(
-            actor_id=actor_id, action="module.data_removed", entity="module", entity_id=module_id
-        )
+        audit.record(actor_id, "module.data_removed", entity="module", entity_id=module_id)
     row.delete()
 
 
