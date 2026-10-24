@@ -7,8 +7,9 @@ from ninja.errors import HttpError
 from ninja.responses import Status
 
 from easybiz.core.api.auth import perm
-from easybiz.core.api.types import ModuleOut, RoleIn, RoleOut, UserIn, UserOut
+from easybiz.core.api.types import AuditOut, ModuleOut, RoleIn, RoleOut, UserIn, UserOut
 from easybiz.core.audit import service as audit
+from easybiz.core.audit.models import AuditLog
 from easybiz.core.catalog.models import TenantModule
 from easybiz.core.events.models import OutboxEvent
 from easybiz.core.iam import service as iam
@@ -146,3 +147,19 @@ def delete_user(request, user_id: str):
     )
     audit.record(request.auth.id, "user.removed", entity="user", entity_id=user_id)
     return Status(204, None)
+
+
+@router.get("/audit", auth=perm("core.audit.read"), response=list[AuditOut])
+def list_audit(request, limit: int = 50):
+    """The tenant audit log, newest first (limit capped at 200)."""
+    rows = AuditLog.objects.order_by("-at")[: min(limit, 200)]
+    return [
+        AuditOut(
+            at=r.at.isoformat(),
+            actor_id=str(r.actor_id) if r.actor_id else None,
+            action=r.action,
+            entity=r.entity,
+            entity_id=r.entity_id,
+        )
+        for r in rows
+    ]

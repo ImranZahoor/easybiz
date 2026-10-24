@@ -63,3 +63,11 @@ class UserOut(Schema):
     id: str
     email: str
     roles: list[str]
+
+
+class AuditOut(Schema):
+    at: str
+    actor_id: str | None
+    action: str
+    entity: str
+    entity_id: str
