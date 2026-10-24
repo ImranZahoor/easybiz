@@ -59,6 +59,12 @@ def install_module(module_id: str) -> None:
 
 
 def sync_catalog() -> list[str]:
+    from easybiz.core.kernel.core_permissions import CORE_PERMISSIONS
+
+    for code, desc in CORE_PERMISSIONS:
+        Permission.objects.update_or_create(
+            code=code, defaults={"module": None, "description": desc}
+        )
     order = registry.load_order()
     for module_id in order:
         install_module(module_id)
