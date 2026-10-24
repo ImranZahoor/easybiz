@@ -26,3 +26,13 @@ class MeOut(Schema):
     permissions: list[str]
     enabled_modules: list[str]
     menu: list[MenuItemOut]
+
+
+class ModuleOut(Schema):
+    id: str
+    name: str
+    version: str
+    status: str
+    requires: list[str]
+    optional: list[str]
+    blocked_by: list[str]
