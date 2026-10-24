@@ -6,7 +6,7 @@ import re
 
 from django.http import JsonResponse
 
-_MODULE_PATH = re.compile(r"^/api/([a-z][a-z0-9_]*)/")
+_MODULE_PATH = re.compile(r"^/api/([a-z][a-z0-9_]*)(/|$)")
 
 
 class TenantStatusMiddleware:

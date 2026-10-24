@@ -37,6 +37,23 @@ def test_new_user_without_password_422(synced, provision):
     assert resp.status_code == 422
 
 
+def test_unknown_role_rolls_back_user(synced, provision, request):
+    from easybiz.core.users.models import Membership, User
+
+    request.addfinalizer(lambda: User.objects.filter(email="bad@acme.test").delete())
+    token = _token(provision)
+    resp = Client().post(
+        "/api/core/users",
+        data={"email": "bad@acme.test", "password": "change-me-now", "roles": ["ghost"]},
+        content_type="application/json",
+        HTTP_HOST="acme.localhost",
+        HTTP_AUTHORIZATION=f"Bearer {token}",
+    )
+    assert resp.status_code == 422
+    assert not User.objects.filter(email="bad@acme.test").exists()  # no dangling identity
+    assert not Membership.objects.filter(user__email="bad@acme.test").exists()
+
+
 def test_cannot_delete_self(synced, provision):
     from easybiz.core.users.models import User
 

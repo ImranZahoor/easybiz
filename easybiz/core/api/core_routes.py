@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.db import transaction
 from ninja import Router
 from ninja.errors import HttpError
 from ninja.responses import Status
@@ -125,8 +126,12 @@ def list_users(request):
 @router.post("/users", auth=perm("core.user.manage"), response={201: UserOut})
 def create_user(request, data: UserIn):
     try:
-        user = users.create_user(data.email, request.tenant, password=data.password, name=data.name)
-        iam.set_user_roles(user.id, data.roles)
+        with transaction.atomic():
+            iam.ensure_roles_exist(data.roles)  # validate before any write
+            user = users.create_user(
+                data.email, request.tenant, password=data.password, name=data.name
+            )
+            iam.set_user_roles(user.id, data.roles)
     except (users.WeakPassword, iam.RoleError) as exc:
         raise HttpError(422, str(exc)) from exc
     audit.record(request.auth.id, "user.added", entity="user", entity_id=str(user.id))
@@ -152,7 +157,7 @@ def delete_user(request, user_id: str):
 @router.get("/audit", auth=perm("core.audit.read"), response=list[AuditOut])
 def list_audit(request, limit: int = 50):
     """The tenant audit log, newest first (limit capped at 200)."""
-    rows = AuditLog.objects.order_by("-at")[: min(limit, 200)]
+    rows = AuditLog.objects.order_by("-at")[: max(0, min(limit, 200))]
     return [
         AuditOut(
             at=r.at.isoformat(),

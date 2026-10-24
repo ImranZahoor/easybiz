@@ -10,6 +10,13 @@ def test_disabled_module_route_is_gated(synced, provision):
     assert "not enabled" in resp.json()["detail"]
 
 
+def test_disabled_module_without_trailing_slash_gated(synced, provision):
+    provision(slug="acme")
+    resp = Client().get("/api/demo", HTTP_HOST="acme.localhost")
+    assert resp.status_code == 404
+    assert "not enabled" in resp.json()["detail"]
+
+
 def test_non_module_path_not_gated(synced, provision):
     provision(slug="acme")
     # /api/auth/* is not a module segment -> reaches the endpoint (401, not the gate's 404)

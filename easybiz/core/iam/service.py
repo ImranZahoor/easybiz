@@ -70,6 +70,15 @@ def create_role(tenant, name: str, permissions, description: str = "") -> Role:
     return role
 
 
+def ensure_roles_exist(role_names) -> None:
+    """Raise RoleError if any named role is missing (read-only; no writes)."""
+    names = list(role_names)
+    existing = set(Role.objects.filter(name__in=names).values_list("name", flat=True))
+    missing = set(names) - existing
+    if missing:
+        raise RoleError(f"unknown roles: {sorted(missing)}")
+
+
 def set_user_roles(user_id, role_names) -> None:
     """Replace the user's role set in the current tenant (RoleError on unknown role)."""
     names = list(role_names)
