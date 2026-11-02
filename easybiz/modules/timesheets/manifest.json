@@ -33,7 +33,7 @@
   ],
   "events": {
     "publishes": ["timesheets.entry.approved", "timesheets.entry.rejected"],
-    "subscribes": []
+    "subscribes": ["core.membership.removed"]
   },
   "menu": [
     {"label": "Timesheets", "route": "/timesheets", "permission": "timesheets.entry.read"},
