@@ -10,7 +10,7 @@ from easybiz.core.api.types import AuditOut, ModuleOut, RoleIn, RoleOut, UserIn,
 from easybiz.core.audit import service as audit
 from easybiz.core.audit.models import AuditLog
 from easybiz.core.catalog.models import TenantModule
-from easybiz.core.events.models import OutboxEvent
+from easybiz.core.events import service as events
 from easybiz.core.iam import service as iam
 from easybiz.core.iam.models import Role, UserRole
 from easybiz.core.kernel import lifecycle, state
@@ -145,9 +145,7 @@ def delete_user(request, user_id: str):
         raise HttpError(404, "user is not a member of this tenant")
     UserRole.objects.filter(user_id=user_id).delete()
     membership.delete()
-    OutboxEvent.objects.create(
-        name="core.membership.removed", producer="core", payload={"user_id": user_id}
-    )
+    events.publish("core.membership.removed", {"user_id": user_id})
     audit.record(request.auth.id, "user.removed", entity="user", entity_id=user_id)
     return Status(204, None)
 
