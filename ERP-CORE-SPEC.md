@@ -73,6 +73,7 @@ These apply to every milestone and feature. They override any conflicting defaul
 - Docstrings: a concise docstring on each public class and function (API handlers especially — Django Ninja surfaces them into the OpenAPI docs), stating intent, not the signature. **One docstring per thing** — never restate the same description in two places (e.g. a module docstring echoing the single class/function it holds).
 - Imports: **all imports at the top of the file**; never inside a function, method, or class body. The only exception is a genuine circular-import or Django app-registry-timing constraint, and that inline import must carry a one-line comment saying why.
 - Apply **DRY** and **SOLID** where they genuinely fit; do not force an abstraction before there is real duplication or a real axis of change.
+- Extract a compound boolean of **three or more conditions** out of an `if`/`while` into a named predicate — a local variable or a small `_is_*`/`_has_*` helper — so the control flow reads as one intent and each condition sits at one altitude.
 
 **Tooling**
 
