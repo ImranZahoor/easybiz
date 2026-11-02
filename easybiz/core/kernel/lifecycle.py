@@ -1,5 +1,3 @@
-"""Per-tenant module lifecycle: install, enable, disable, remove, upgrade."""
-
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -14,8 +12,10 @@ from easybiz.core.catalog.models import Module, Permission, TenantModule
 from easybiz.core.events.models import OutboxEvent
 from easybiz.core.iam.models import Role, RolePermission
 from easybiz.core.kernel import state
+from easybiz.core.kernel.core_permissions import CORE_PERMISSIONS
 from easybiz.core.kernel.manifest import Version, VersionRange
 from easybiz.core.kernel.registry import registry
+from easybiz.core.tenancy.models import Tenant
 
 
 class LifecycleError(Exception):
@@ -32,8 +32,6 @@ def _keep_connection_tenant():
         if previous == get_public_schema_name():
             connection.set_schema_to_public()
         else:
-            from easybiz.core.tenancy.models import Tenant
-
             connection.set_tenant(Tenant.objects.get(schema_name=previous))
 
 
@@ -59,8 +57,6 @@ def install_module(module_id: str) -> None:
 
 
 def sync_catalog() -> list[str]:
-    from easybiz.core.kernel.core_permissions import CORE_PERMISSIONS
-
     for code, desc in CORE_PERMISSIONS:
         Permission.objects.update_or_create(
             code=code, defaults={"module": None, "description": desc}

@@ -1,5 +1,3 @@
-"""Tenant JWT auth, the ``perm()`` guard, and the /auth endpoints."""
-
 from __future__ import annotations
 
 import time

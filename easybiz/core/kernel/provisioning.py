@@ -1,5 +1,3 @@
-"""All-or-nothing tenant provisioning (I14)."""
-
 from __future__ import annotations
 
 from collections.abc import Iterable

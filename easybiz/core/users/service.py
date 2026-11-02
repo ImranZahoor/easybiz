@@ -1,5 +1,3 @@
-"""Authentication against the global user directory + per-tenant membership."""
-
 from __future__ import annotations
 
 from easybiz.core.users.models import Membership, User

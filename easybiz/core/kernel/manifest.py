@@ -1,5 +1,3 @@
-"""Module manifest parsing, validation, and version-range semantics."""
-
 from __future__ import annotations
 
 import re

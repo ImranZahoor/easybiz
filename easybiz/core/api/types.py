@@ -1,5 +1,3 @@
-"""Ninja request/response schemas for the tenant API."""
-
 from ninja import Schema
 
 

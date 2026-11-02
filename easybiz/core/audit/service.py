@@ -1,5 +1,3 @@
-"""Tenant audit log writer (writes in the caller's schema and transaction)."""
-
 from __future__ import annotations
 
 from uuid import UUID

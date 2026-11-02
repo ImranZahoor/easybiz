@@ -1,5 +1,3 @@
-"""Authorization helpers: a user's effective permissions, wildcard checks, menu."""
-
 from __future__ import annotations
 
 from django.db.models import Q

@@ -1,5 +1,3 @@
-"""Enabled-module lookups that tolerate the pk-less stub tenant (I13)."""
-
 from __future__ import annotations
 
 from django_tenants.utils import get_public_schema_name

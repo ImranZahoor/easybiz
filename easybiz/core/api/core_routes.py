@@ -1,5 +1,3 @@
-"""Tenant /core resource endpoints."""
-
 from __future__ import annotations
 
 from django.db import transaction

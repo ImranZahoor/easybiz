@@ -1,5 +1,3 @@
-"""Tenant validation and lifecycle operations (provisioning lives in provisioning.py)."""
-
 from __future__ import annotations
 
 import re

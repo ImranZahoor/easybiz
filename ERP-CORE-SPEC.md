@@ -69,8 +69,9 @@ These apply to every milestone and feature. They override any conflicting defaul
 **Code layout**
 
 - Types stay out of logic files. Request/response schemas and type definitions live in their own module, `types.py`; `api.py` imports them and holds only routers and handlers. Reinforces "small modules" in §0.4.
-- Comments: no narration of *what* the code does. Add a single-line comment only where the *why* is not obvious from the code.
-- Docstrings: every public class and function carries a docstring, especially API handlers — Django Ninja surfaces them into the OpenAPI docs. The docstring states intent/behaviour, not the signature.
+- Comments: no narration of *what* the code does. Add a single-line comment only where the *why* is not obvious from the code. **No module-level (top-of-file) docstrings/comments** — the module name and its contents are the documentation.
+- Docstrings: a concise docstring on each public class and function (API handlers especially — Django Ninja surfaces them into the OpenAPI docs), stating intent, not the signature. **One docstring per thing** — never restate the same description in two places (e.g. a module docstring echoing the single class/function it holds).
+- Imports: **all imports at the top of the file**; never inside a function, method, or class body. The only exception is a genuine circular-import or Django app-registry-timing constraint, and that inline import must carry a one-line comment saying why.
 - Apply **DRY** and **SOLID** where they genuinely fit; do not force an abstraction before there is real duplication or a real axis of change.
 
 **Tooling**

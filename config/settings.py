@@ -1,5 +1,3 @@
-"""Single settings module (§0.5). Env differences come from a .env file."""
-
 import os
 import sys
 from pathlib import Path

@@ -1,10 +1,11 @@
-"""Request gates: suspended-tenant block and per-tenant module routing."""
-
 from __future__ import annotations
 
 import re
 
 from django.http import JsonResponse
+
+from easybiz.core.kernel import state
+from easybiz.core.kernel.registry import registry
 
 _MODULE_PATH = re.compile(r"^/api/([a-z][a-z0-9_]*)(/|$)")
 
@@ -31,9 +32,6 @@ class ModuleGateMiddleware:
     def __call__(self, request):
         match = _MODULE_PATH.match(request.path)
         if match:
-            from easybiz.core.kernel import state
-            from easybiz.core.kernel.registry import registry
-
             segment = match.group(1)
             tenant = getattr(request, "tenant", None)
             if (

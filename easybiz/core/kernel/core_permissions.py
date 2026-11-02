@@ -1,5 +1,3 @@
-"""The core (non-module) permission catalogue, synced alongside module permissions."""
-
 CORE_PERMISSIONS: list[tuple[str, str]] = [
     ("core.module.read", "See modules and their status"),
     ("core.module.manage", "Enable, disable, and remove modules"),
