@@ -1,14 +1,16 @@
 from decimal import Decimal
 
+from django.db import transaction
 from ninja import Router
 from ninja.errors import HttpError
 from ninja.responses import Status
 
 from easybiz.core.api.security import perm
 from easybiz.core.audit import service as audit
+from easybiz.core.events import service as events
 from easybiz.core.iam import service as iam
 from easybiz.modules.timesheets.models import Entry, Project
-from easybiz.modules.timesheets.types import EntryIn, EntryOut, ProjectIn, ProjectOut
+from easybiz.modules.timesheets.types import EntryIn, EntryOut, ProjectIn, ProjectOut, RejectIn
 
 router = Router()
 
@@ -97,3 +99,53 @@ def submit_entry(request, entry_id: str):
     entry.status = Entry.SUBMITTED
     entry.save(update_fields=["status"])
     return _entry_view(entry)
+
+
+def _review(
+    request, entry_id: str, new_status: str, event_name: str, review_note: str = ""
+) -> EntryOut:
+    """Shared approve/reject: a submitted entry that is not the reviewer's own."""
+    entry = Entry.objects.filter(id=entry_id).first()
+    if entry is None:
+        raise HttpError(404, "entry not found")
+    if entry.status != Entry.SUBMITTED:
+        raise HttpError(409, f"entry is {entry.status}, not submitted")
+    if entry.user_id == request.auth.id:
+        raise HttpError(403, "cannot review your own time")
+    with transaction.atomic():
+        entry.status = new_status
+        entry.reviewed_by = request.auth.id
+        entry.review_note = review_note
+        entry.save(update_fields=["status", "reviewed_by", "review_note"])
+        audit.record(
+            request.auth.id,
+            f"timesheets.entry.{new_status}",
+            entity="entry",
+            entity_id=str(entry.id),
+        )
+        events.publish(
+            event_name,
+            {
+                "entry_id": str(entry.id),
+                "user_id": str(entry.user_id),
+                "project_id": str(entry.project_id),
+                "work_date": entry.work_date.isoformat(),
+                "hours": str(entry.hours),
+            },
+            producer="timesheets",
+        )
+    return _entry_view(entry)
+
+
+@router.post(
+    "/entries/{entry_id}/approve", auth=perm("timesheets.entry.approve"), response=EntryOut
+)
+def approve_entry(request, entry_id: str):
+    """Approve a submitted entry (not your own); publishes timesheets.entry.approved."""
+    return _review(request, entry_id, Entry.APPROVED, "timesheets.entry.approved")
+
+
+@router.post("/entries/{entry_id}/reject", auth=perm("timesheets.entry.approve"), response=EntryOut)
+def reject_entry(request, entry_id: str, data: RejectIn):
+    """Reject a submitted entry (not your own); publishes timesheets.entry.rejected."""
+    return _review(request, entry_id, Entry.REJECTED, "timesheets.entry.rejected", data.reason)
