@@ -1,5 +1,3 @@
-"""Capability registry: resolve a contract only while its provider is enabled."""
-
 from __future__ import annotations
 
 from django.db import connection

@@ -1,5 +1,3 @@
-"""All-or-nothing tenant provisioning (I14)."""
-
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -8,7 +6,7 @@ from uuid import UUID
 from django.db import connection, transaction
 from django_tenants.utils import tenant_context
 
-from easybiz.core.audit.models import AuditLog
+from easybiz.core.audit import service as audit
 from easybiz.core.iam.models import Role, RolePermission, UserRole
 from easybiz.core.kernel import lifecycle
 from easybiz.core.kernel.registry import registry
@@ -52,9 +50,7 @@ def provision_tenant(
             )
             RolePermission.objects.get_or_create(role=role, permission="*")
             UserRole.objects.get_or_create(user_id=owner.id, role=role)
-            AuditLog.objects.create(
-                actor_id=actor_id, action="tenant.provisioned", entity="tenant", entity_id=slug
-            )
+            audit.record(actor_id, "tenant.provisioned", entity="tenant", entity_id=slug)
 
         requested = set(modules)
         for module_id in [m for m in registry.load_order() if m in requested]:

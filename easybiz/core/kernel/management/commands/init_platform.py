@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from easybiz.core.kernel import lifecycle
 from easybiz.core.tenancy.models import Domain, Tenant
 
 
@@ -23,9 +24,6 @@ class Command(BaseCommand):
             tenant=tenant,
             defaults={"is_primary": True},
         )
-
-        from easybiz.core.kernel import lifecycle
-
         lifecycle.sync_catalog()
         self.stdout.write(
             f"public tenant {'created' if created else 'exists'}; "

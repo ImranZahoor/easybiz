@@ -1,5 +1,3 @@
-"""Per-tenant module lifecycle: install, enable, disable, remove, upgrade."""
-
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -9,13 +7,15 @@ from django.db import connection, transaction
 from django.utils import timezone
 from django_tenants.utils import get_public_schema_name, tenant_context
 
-from easybiz.core.audit.models import AuditLog
+from easybiz.core.audit import service as audit
 from easybiz.core.catalog.models import Module, Permission, TenantModule
 from easybiz.core.events.models import OutboxEvent
 from easybiz.core.iam.models import Role, RolePermission
 from easybiz.core.kernel import state
+from easybiz.core.kernel.core_permissions import CORE_PERMISSIONS
 from easybiz.core.kernel.manifest import Version, VersionRange
 from easybiz.core.kernel.registry import registry
+from easybiz.core.tenancy.models import Tenant
 
 
 class LifecycleError(Exception):
@@ -32,8 +32,6 @@ def _keep_connection_tenant():
         if previous == get_public_schema_name():
             connection.set_schema_to_public()
         else:
-            from easybiz.core.tenancy.models import Tenant
-
             connection.set_tenant(Tenant.objects.get(schema_name=previous))
 
 
@@ -59,6 +57,10 @@ def install_module(module_id: str) -> None:
 
 
 def sync_catalog() -> list[str]:
+    for code, desc in CORE_PERMISSIONS:
+        Permission.objects.update_or_create(
+            code=code, defaults={"module": None, "description": desc}
+        )
     order = registry.load_order()
     for module_id in order:
         install_module(module_id)
@@ -93,9 +95,9 @@ def enable_module(tenant, module_id: str, actor_id=None) -> None:
         with tenant_context(tenant), transaction.atomic():
             _seed_roles(manifest)
             requeue_parked(module_id)
-            AuditLog.objects.create(
-                actor_id=actor_id,
-                action="module.enabled",
+            audit.record(
+                actor_id,
+                "module.enabled",
                 entity="module",
                 entity_id=module_id,
                 after={"version": manifest.version},
@@ -130,9 +132,7 @@ def disable_module(tenant, module_id: str, actor_id=None) -> None:
         status=TenantModule.DISABLED
     )
     with tenant_context(tenant), transaction.atomic():
-        AuditLog.objects.create(
-            actor_id=actor_id, action="module.disabled", entity="module", entity_id=module_id
-        )
+        audit.record(actor_id, "module.disabled", entity="module", entity_id=module_id)
         OutboxEvent.objects.create(
             name="core.module.disabled", producer="core", payload={"module": module_id}
         )
@@ -154,9 +154,7 @@ def remove_module_data(tenant, module_id: str, actor_id=None, policy: str = "dro
     codes = {code for code, _ in manifest.permissions} if manifest else set()
     with tenant_context(tenant), transaction.atomic():
         RolePermission.objects.filter(permission__in=codes).delete()
-        AuditLog.objects.create(
-            actor_id=actor_id, action="module.data_removed", entity="module", entity_id=module_id
-        )
+        audit.record(actor_id, "module.data_removed", entity="module", entity_id=module_id)
     row.delete()
 
 

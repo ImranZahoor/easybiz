@@ -1,5 +1,7 @@
 from django.apps import AppConfig
 
+from easybiz.core.kernel.registry import registry
+
 
 class KernelConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
@@ -8,8 +10,6 @@ class KernelConfig(AppConfig):
 
     def ready(self) -> None:
         """Load and validate module manifests at startup (M2)."""
-        from easybiz.core.kernel.registry import registry
-
         registry.ensure_loaded()
         registry.verify_apps()
         registry.import_module_code()

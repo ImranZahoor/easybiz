@@ -1,11 +1,12 @@
-"""Module registry: manifests, dependency graph, handlers, discovery wiring."""
-
 from __future__ import annotations
 
 import importlib
 import importlib.util
 import json
 from pathlib import Path
+
+from django.apps import apps
+from django.conf import settings
 
 from easybiz.core.kernel.manifest import Manifest, Version, VersionRange, parse_manifest
 
@@ -135,15 +136,11 @@ class Registry:
     def ensure_loaded(self) -> None:
         if self._loaded:
             return
-        from django.conf import settings
-
         self.load_packages(settings.EASYBIZ_MODULE_PACKAGES)
         self._loaded = True
 
     def verify_apps(self) -> None:
         """Each module's Django app label must equal its id and name equal its package."""
-        from django.apps import apps
-
         for mid, manifest in self._manifests.items():
             try:
                 app = apps.get_app_config(mid)
