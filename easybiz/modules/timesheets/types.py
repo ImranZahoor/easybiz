@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from uuid import UUID
 
 from ninja import Schema
 
@@ -17,7 +18,7 @@ class ProjectOut(Schema):
 
 
 class EntryIn(Schema):
-    project_id: str
+    project_id: UUID
     work_date: date
     hours: Decimal
     note: str = ""

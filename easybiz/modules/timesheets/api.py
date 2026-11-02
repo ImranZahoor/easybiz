@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import UUID
 
 from django.db import transaction
 from ninja import Router
@@ -59,8 +60,10 @@ def create_project(request, data: ProjectIn):
 @router.post("/entries", auth=perm("timesheets.entry.create"), response={201: EntryOut})
 def create_entry(request, data: EntryIn):
     """Create a draft entry for the caller against an active project."""
-    if not (Decimal(0) < data.hours <= Decimal(24)):
-        raise HttpError(422, "hours must be in (0, 24]")
+    if not (Decimal(0) < data.hours <= Decimal(24)) or data.hours != data.hours.quantize(
+        Decimal("0.01")
+    ):
+        raise HttpError(422, "hours must be in (0, 24] with at most 2 decimal places")
     project = Project.objects.filter(id=data.project_id, is_active=True).first()
     if project is None:
         raise HttpError(404, "project not found or inactive")
@@ -75,7 +78,7 @@ def create_entry(request, data: EntryIn):
 
 
 @router.get("/entries", auth=perm("timesheets.entry.read"), response=list[EntryOut])
-def list_entries(request, status: str | None = None, user_id: str | None = None):
+def list_entries(request, status: str | None = None, user_id: UUID | None = None):
     """Own entries for a plain reader; all entries (optionally filtered by user) for an approver."""
     entries = Entry.objects.all()
     if _can_approve(request):
@@ -89,7 +92,7 @@ def list_entries(request, status: str | None = None, user_id: str | None = None)
 
 
 @router.post("/entries/{entry_id}/submit", auth=perm("timesheets.entry.create"), response=EntryOut)
-def submit_entry(request, entry_id: str):
+def submit_entry(request, entry_id: UUID):
     """Submit the caller's own draft or rejected entry."""
     entry = Entry.objects.filter(id=entry_id, user_id=request.auth.id).first()
     if entry is None:
@@ -102,7 +105,7 @@ def submit_entry(request, entry_id: str):
 
 
 def _review(
-    request, entry_id: str, new_status: str, event_name: str, review_note: str = ""
+    request, entry_id: UUID, new_status: str, event_name: str, review_note: str = ""
 ) -> EntryOut:
     """Shared approve/reject: a submitted entry that is not the reviewer's own."""
     entry = Entry.objects.filter(id=entry_id).first()
@@ -140,12 +143,12 @@ def _review(
 @router.post(
     "/entries/{entry_id}/approve", auth=perm("timesheets.entry.approve"), response=EntryOut
 )
-def approve_entry(request, entry_id: str):
+def approve_entry(request, entry_id: UUID):
     """Approve a submitted entry (not your own); publishes timesheets.entry.approved."""
     return _review(request, entry_id, Entry.APPROVED, "timesheets.entry.approved")
 
 
 @router.post("/entries/{entry_id}/reject", auth=perm("timesheets.entry.approve"), response=EntryOut)
-def reject_entry(request, entry_id: str, data: RejectIn):
+def reject_entry(request, entry_id: UUID, data: RejectIn):
     """Reject a submitted entry (not your own); publishes timesheets.entry.rejected."""
     return _review(request, entry_id, Entry.REJECTED, "timesheets.entry.rejected", data.reason)
