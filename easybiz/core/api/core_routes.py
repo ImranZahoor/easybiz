@@ -5,7 +5,7 @@ from ninja import Router
 from ninja.errors import HttpError
 from ninja.responses import Status
 
-from easybiz.core.api.auth import perm
+from easybiz.core.api.security import perm
 from easybiz.core.api.types import AuditOut, ModuleOut, RoleIn, RoleOut, UserIn, UserOut
 from easybiz.core.audit import service as audit
 from easybiz.core.audit.models import AuditLog
