@@ -33,14 +33,16 @@ class ModuleGateMiddleware:
         match = _MODULE_PATH.match(request.path)
         if match:
             segment = match.group(1)
-            tenant = getattr(request, "tenant", None)
-            if (
-                registry.manifest(segment) is not None
-                and tenant is not None
-                and not state.is_enabled(tenant, segment)
-            ):
+            if self._route_is_gated(segment, getattr(request, "tenant", None)):
                 return JsonResponse(
                     {"detail": f"Module '{segment}' is not enabled for this tenant"},
                     status=404,
                 )
         return self.get_response(request)
+
+    @staticmethod
+    def _route_is_gated(segment, tenant) -> bool:
+        """True if `segment` is an installed module the resolved tenant has not enabled."""
+        if tenant is None or registry.manifest(segment) is None:
+            return False
+        return not state.is_enabled(tenant, segment)
