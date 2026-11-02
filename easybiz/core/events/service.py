@@ -32,7 +32,8 @@ def publish(
 def requeue_parked(module_id: str) -> int:
     """Re-queue events parked on a module after it is enabled (the inbox blocks re-runs)."""
     count = 0
-    for event in OutboxEvent.objects.filter(parked__contains=module_id):
+    live = OutboxEvent.objects.filter(parked__contains=module_id, status=OutboxEvent.PENDING)
+    for event in live:
         event.parked = [m for m in event.parked if m != module_id]
         event.status = OutboxEvent.PENDING
         event.next_attempt_at = timezone.now()
@@ -114,7 +115,10 @@ def _finalise(event, *, failed: bool, parked: bool, now, counts: Counter) -> Non
             counts["retry"] += 1
         event.save()
     elif parked:
-        event.save()  # stays pending; replayed after requeue_parked
+        # Stays pending; replayed by requeue_parked when the module is enabled. Push the
+        # next attempt out so parked events do not hot-loop and starve deliverable ones.
+        event.next_attempt_at = now + timedelta(hours=1)
+        event.save()
     else:
         event.status = OutboxEvent.DONE
         event.processed_at = now
