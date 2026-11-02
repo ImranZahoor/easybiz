@@ -6,6 +6,6 @@
   "roles": [
     {"name": "demo_viewer", "description": "Views widgets", "permissions": ["demo.widget.read"]}
   ],
-  "events": {"publishes": [], "subscribes": []},
+  "events": {"publishes": [], "subscribes": ["core.module.enabled"]},
   "menu": []
 }

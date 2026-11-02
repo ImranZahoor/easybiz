@@ -6,6 +6,18 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**M5 (events) — complete.** The transactional outbox now delivers:
+`events.publish(name, payload, producer, version)` writes an `OutboxEvent` in the
+business transaction (a module publishing an undeclared event raises `EventError`);
+`dispatch_pending` locks due pending events (`select_for_update(skip_locked=True)`)
+and runs each registered handler in a savepoint, recording an inbox row keyed
+`(event_id, "<module>.<func>")` so delivery is at-least-once and idempotent. A
+handler whose module is not enabled for the tenant is **parked** and replayed when
+the module is enabled; a failing handler retries with exponential backoff
+(`min(5·2^attempts, 3600)s`) and dead-letters at `EASYBIZ_EVENT_MAX_ATTEMPTS`. The
+`run_dispatcher` command sweeps active tenants. The M3/M4 lifecycle and
+membership-removal writes now go through `events.publish`.
+
 **M4 (authentication, authorization, audit & tenant API) — complete.** JWT login
 (`POST /api/auth/login`) and `GET /api/auth/me` (identity, permissions, enabled
 modules, menu); the `perm()` guard enforcing permission codes (`*` / exact /
@@ -15,10 +27,10 @@ remove-data), roles (list/create), users (list/create/delete), audit. Backed by
 `users`/`iam`/`audit` services and the core permission catalogue. Builds on M3
 (module system + provisioning) and M0–M2 (skeleton, tenancy/identity, kernel).
 
-Next: **M5** (the events dispatcher — `events/service.publish`/`dispatch_pending`
-+ `run_dispatcher`) and **M6** (the real Timesheets module). Multiple auth methods
-(2FA, magic link, social/SSO, refresh tokens) are deferred to **F13**; role
-inheritance to **F14**.
+Next: **M6** (the real Timesheets module, with its event and capability tests).
+Multiple auth methods (2FA, magic link, social/SSO, refresh tokens) are deferred to
+**F13**; role inheritance to **F14**; Celery-backed dispatch, delivery leases, and
+retention to **F15**.
 
 ## Prerequisites
 
@@ -50,6 +62,7 @@ uv run manage.py provision_tenant acme --domain acme.localhost \
     --owner-email owner@acme.test --owner-password change-me-now --modules demo
 uv run manage.py tenant_module acme enable demo       # per-tenant enable/disable/remove
 uv run manage.py upgrade_modules              # after deploying new module code
+uv run manage.py run_dispatcher               # deliver outbox events (add --once for a single sweep)
 ```
 
 The tenant API is served per tenant host (e.g. `http://acme.localhost:8000/api/`):

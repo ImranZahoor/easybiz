@@ -9,7 +9,7 @@ from django_tenants.utils import get_public_schema_name, tenant_context
 
 from easybiz.core.audit import service as audit
 from easybiz.core.catalog.models import Module, Permission, TenantModule
-from easybiz.core.events.models import OutboxEvent
+from easybiz.core.events.service import publish, requeue_parked
 from easybiz.core.iam.models import Role, RolePermission
 from easybiz.core.kernel import state
 from easybiz.core.kernel.core_permissions import CORE_PERMISSIONS
@@ -102,10 +102,9 @@ def enable_module(tenant, module_id: str, actor_id=None) -> None:
                 entity_id=module_id,
                 after={"version": manifest.version},
             )
-            OutboxEvent.objects.create(
-                name="core.module.enabled",
-                producer="core",
-                payload={"module": module_id, "version": manifest.version},
+            publish(
+                "core.module.enabled",
+                {"module": module_id, "version": manifest.version},
             )
     except Exception as exc:
         # tables are migrated but seeding failed: leave the row DISABLED (tables
@@ -133,9 +132,7 @@ def disable_module(tenant, module_id: str, actor_id=None) -> None:
     )
     with tenant_context(tenant), transaction.atomic():
         audit.record(actor_id, "module.disabled", entity="module", entity_id=module_id)
-        OutboxEvent.objects.create(
-            name="core.module.disabled", producer="core", payload={"module": module_id}
-        )
+        publish("core.module.disabled", {"module": module_id})
 
 
 def remove_module_data(tenant, module_id: str, actor_id=None, policy: str = "drop") -> None:
@@ -167,17 +164,6 @@ def upgrade_modules() -> list[str]:
         if manifest:
             TenantModule.objects.filter(pk=row.pk).update(installed_version=manifest.version)
     return order
-
-
-def requeue_parked(module_id: str) -> int:
-    count = 0
-    for event in OutboxEvent.objects.filter(parked__contains=module_id):
-        event.parked = [m for m in event.parked if m != module_id]
-        event.status = OutboxEvent.PENDING
-        event.next_attempt_at = timezone.now()
-        event.save(update_fields=["parked", "status", "next_attempt_at"])
-        count += 1
-    return count
 
 
 # --- helpers -----------------------------------------------------------------

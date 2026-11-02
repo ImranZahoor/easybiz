@@ -110,6 +110,10 @@ class Registry:
                 )
         self._handlers.setdefault(event, []).append(func)
 
+    def handlers_for(self, event: str) -> list:
+        """Registered handlers for an event, in registration order."""
+        return list(self._handlers.get(event, []))
+
     def subscribe(self, event: str):
         """Decorator form of add_handler, inferring the module from the handler."""
 
