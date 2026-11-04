@@ -6,8 +6,37 @@
   "optional": [],
   "provides": [],
   "consumes": [],
-  "permissions": [],
-  "roles": [],
-  "events": {"publishes": [], "subscribes": []},
-  "menu": []
+  "permissions": [
+    {"code": "timesheets.project.read", "description": "View projects"},
+    {"code": "timesheets.project.manage", "description": "Create and manage projects"},
+    {"code": "timesheets.entry.create", "description": "Create and submit own time entries"},
+    {"code": "timesheets.entry.read", "description": "View time entries"},
+    {"code": "timesheets.entry.approve", "description": "Approve or reject submitted entries"}
+  ],
+  "roles": [
+    {
+      "name": "timesheet_user",
+      "description": "Logs and submits own time",
+      "permissions": ["timesheets.project.read", "timesheets.entry.create", "timesheets.entry.read"]
+    },
+    {
+      "name": "timesheet_approver",
+      "description": "Manages projects and reviews time",
+      "permissions": [
+        "timesheets.project.read",
+        "timesheets.project.manage",
+        "timesheets.entry.create",
+        "timesheets.entry.read",
+        "timesheets.entry.approve"
+      ]
+    }
+  ],
+  "events": {
+    "publishes": ["timesheets.entry.approved", "timesheets.entry.rejected"],
+    "subscribes": ["core.membership.removed"]
+  },
+  "menu": [
+    {"label": "Timesheets", "route": "/timesheets", "permission": "timesheets.entry.read"},
+    {"label": "Projects", "route": "/timesheets/projects", "permission": "timesheets.project.manage"}
+  ]
 }

@@ -6,6 +6,19 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**M6 (Timesheets reference module) — complete.** The first full business module,
+proving the module contract end to end: `timesheets_project`/`timesheets_entry`
+tables (created only when enabled), `/api/timesheets` endpoints — projects
+(read/manage, code uppercased, duplicate → 409) and entries (create with hours
+bounds + active-project check, own-vs-all visibility, submit) and review
+(approve/reject requiring `entry.approve`, 403 on self-review, `submitted`-only,
+publishing `timesheets.entry.approved`/`.rejected` in the same transaction as the
+status change + audit); a `core.membership.removed` handler that drops a removed
+member's draft time (keeping submitted/approved); the `AttendanceProvider`
+capability (approved-hours sum, available only while enabled); default roles
+(`timesheet_user`/`timesheet_approver`) and menu. Module API routers now
+auto-mount at `/api/<module>` (gated per-tenant by the module-gate middleware).
+
 **M5 (events) — complete.** The transactional outbox now delivers:
 `events.publish(name, payload, producer, version)` writes an `OutboxEvent` in the
 business transaction (a module publishing an undeclared event raises `EventError`);
@@ -27,8 +40,8 @@ remove-data), roles (list/create), users (list/create/delete), audit. Backed by
 `users`/`iam`/`audit` services and the core permission catalogue. Builds on M3
 (module system + provisioning) and M0–M2 (skeleton, tenancy/identity, kernel).
 
-Next: **M6** (the real Timesheets module, with its event and capability tests).
-Multiple auth methods (2FA, magic link, social/SSO, refresh tokens) are deferred to
+Next: **M7** (platform admin API). Multiple auth methods (2FA, magic link,
+social/SSO, refresh tokens) are deferred to
 **F13**; role inheritance to **F14**; Celery-backed dispatch, delivery leases, and
 retention to **F15**.
 
@@ -59,7 +72,7 @@ uv run manage.py makemigrations --check --dry-run     # verify no un-authored mi
 
 uv run manage.py sync_modules                 # record on-disk modules in the catalog
 uv run manage.py provision_tenant acme --domain acme.localhost \
-    --owner-email owner@acme.test --owner-password change-me-now --modules demo
+    --owner-email owner@acme.test --owner-password change-me-now --modules timesheets
 uv run manage.py tenant_module acme enable demo       # per-tenant enable/disable/remove
 uv run manage.py upgrade_modules              # after deploying new module code
 uv run manage.py run_dispatcher               # deliver outbox events (add --once for a single sweep)
