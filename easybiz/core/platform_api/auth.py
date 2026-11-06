@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from ninja import Router
 from ninja.errors import HttpError
 from ninja.throttling import AnonRateThrottle
@@ -9,10 +10,17 @@ from easybiz.core.users.models import User
 
 router = Router()
 
+# A real hash to verify against on the miss path, so a non-admin email costs the same
+# time as a real one and cannot be enumerated by response latency.
+_DUMMY_HASH = make_password("platform-login-timing-equalizer")
+
 
 def _authenticate_platform(email: str, password: str) -> User | None:
     user = User.objects.filter(email=email.lower(), is_active=True, is_platform_admin=True).first()
-    if user is None or not user.check_password(password):
+    if user is None:
+        check_password(password, _DUMMY_HASH)
+        return None
+    if not user.check_password(password):
         return None
     return user
 

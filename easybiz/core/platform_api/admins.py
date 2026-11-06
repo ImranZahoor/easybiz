@@ -1,3 +1,4 @@
+from django.db import transaction
 from ninja import Router
 from ninja.errors import HttpError
 from ninja.responses import Status
@@ -51,13 +52,18 @@ def remove_admin(request, admin_id: str):
     """Demote a platform admin; cannot remove yourself or the last admin."""
     if str(request.auth.id) == admin_id:
         raise HttpError(409, "you cannot remove yourself")
-    user = User.objects.filter(id=admin_id, is_platform_admin=True).first()
-    if user is None:
-        raise HttpError(404, "platform admin not found")
-    if User.objects.filter(is_platform_admin=True, is_active=True).count() <= 1:
-        raise HttpError(409, "cannot remove the last platform admin")
-    user.is_platform_admin = False
-    user.save(update_fields=["is_platform_admin"])
+    with transaction.atomic():
+        # Lock the admin set so concurrent removals can't both pass the count check.
+        admins = list(
+            User.objects.select_for_update().filter(is_platform_admin=True, is_active=True)
+        )
+        user = next((u for u in admins if str(u.id) == admin_id), None)
+        if user is None:
+            raise HttpError(404, "platform admin not found")
+        if len(admins) <= 1:
+            raise HttpError(409, "cannot remove the last platform admin")
+        user.is_platform_admin = False
+        user.save(update_fields=["is_platform_admin"])
     record_platform(request.auth, "admin.removed", target=user.email)
     return Status(204, None)
 
