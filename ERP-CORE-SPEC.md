@@ -576,7 +576,8 @@ Errors are `{"detail": "..."}` unless noted. "perm" is the required permission.
 | Method and path | Auth / perm | Request | Success | Errors |
 |---|---|---|---|---|
 | `POST /auth/login` | none | `{email, password}` | 200 `{access_token, token_type, expires_in}` | 401 |
-| `GET /auth/me` | any member | | 200 `{id, email, permissions[], enabled_modules[], menu[{module,label,route}]}` | 401 |
+| `GET /auth/me` | any member | | 200 `{id, email, permissions[], menu[{module,label,route}]}` (user-scoped only) | 401 |
+| `GET /core/context` | any member | | 200 `{tenant:{slug,name}, enabled_modules[]}` (tenant-scoped bootstrap; no module permission required) | 401 |
 | `GET /core/modules` | `core.module.read` | | 200 `[{id,name,version,status,requires[],optional[],blocked_by[]}]` where `status` is `enabled`, `disabled` or `available` | 401, 403 |
 | `POST /core/modules/{id}/enable` | `core.module.manage` | | 200 module object | 409 lifecycle error |
 | `POST /core/modules/{id}/disable` | `core.module.manage` | | 200 module object | 409 |
@@ -1182,7 +1183,7 @@ class EmployeeProvider(Protocol):
    - the gate answers 404 when disabled.
 6. **System-wide uninstall.** `python manage.py uninstall_module <id>` succeeds only when no tenant has a `TenantModule` row for it; removes catalog and permission rows; code removal remains a deploy step.
 7. **Runbook for adding module code.** Document the rolling deploy: build an image containing the new package, deploy, run `upgrade_modules`, enable per tenant. Note the limit (D9).
-8. **Module UI contributions.** `GET /api/auth/me` includes the `ui` blocks of enabled modules for the shell (F18).
+8. **Module UI contributions.** `GET /api/core/context` includes the `ui` blocks of enabled modules for the shell (F18).
 
 **Acceptance criteria**
 - [ ] `startmodule demo` produces a module that passes `check_module demo` without edits, and refuses to overwrite.

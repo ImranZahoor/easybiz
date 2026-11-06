@@ -22,8 +22,17 @@ class MeOut(Schema):
     id: str
     email: str
     permissions: list[str]
-    enabled_modules: list[str]
     menu: list[MenuItemOut]
+
+
+class TenantSummary(Schema):
+    slug: str
+    name: str
+
+
+class ContextOut(Schema):
+    tenant: TenantSummary
+    enabled_modules: list[str]
 
 
 class ModuleOut(Schema):

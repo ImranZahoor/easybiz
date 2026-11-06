@@ -7,7 +7,6 @@ from ninja.errors import HttpError
 from easybiz.core.api.security import authenticated, encode_tenant_token
 from easybiz.core.api.types import LoginIn, MeOut, TokenOut
 from easybiz.core.iam import service as iam
-from easybiz.core.kernel import state
 from easybiz.core.users import service as users
 
 router = Router()
@@ -27,13 +26,12 @@ def login(request, data: LoginIn):
 
 @router.get("/me", auth=authenticated, response=MeOut)
 def me(request):
-    """The caller's identity, effective permissions, enabled modules, and menu."""
+    """The caller's identity, effective permissions, and menu."""
     user = request.auth
     perms = iam.permissions_for(user.id)
     return MeOut(
         id=str(user.id),
         email=user.email,
         permissions=sorted(perms),
-        enabled_modules=sorted(state.enabled_module_ids(request.tenant)),
         menu=iam.menu_for(request.tenant, perms),
     )
