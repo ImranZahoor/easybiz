@@ -93,3 +93,23 @@ class ModuleCatalogOut(Schema):
 
 class ModulesOut(Schema):
     modules: list[str]
+
+
+class AdminIn(Schema):
+    email: str
+    password: str | None = None
+    name: str | None = None
+
+
+class AdminOut(Schema):
+    id: str
+    email: str
+    name: str = ""
+
+
+class PlatformAuditOut(Schema):
+    at: str
+    actor_email: str
+    action: str
+    target: str
+    detail: dict
