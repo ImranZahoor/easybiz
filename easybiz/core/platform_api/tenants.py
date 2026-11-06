@@ -2,16 +2,22 @@ from django.db.models import Q
 from django_tenants.utils import get_public_schema_name
 from ninja import Router
 from ninja.errors import HttpError
+from ninja.responses import Status
 
 from easybiz.core.api.platform_security import platform_auth
 from easybiz.core.catalog.models import Module, TenantModule
+from easybiz.core.kernel import provisioning
+from easybiz.core.kernel import tenants as tops
 from easybiz.core.platform_api.types import (
     DomainOut,
     OverviewOut,
+    TenantCreateIn,
     TenantListOut,
     TenantModuleOut,
     TenantOut,
+    TenantRenameIn,
 )
+from easybiz.core.tenancy.audit import record_platform
 from easybiz.core.tenancy.models import Domain, Tenant
 from easybiz.core.users.models import Membership, User
 
@@ -81,3 +87,58 @@ def list_tenants(
 def get_tenant(request, slug: str):
     """One tenant by slug."""
     return _tenant_view(_get_tenant_or_404(slug))
+
+
+@router.post("/tenants", auth=platform_auth, response={201: TenantOut})
+def create_tenant(request, data: TenantCreateIn):
+    """Provision a tenant (all-or-nothing); validation/conflict errors map to 422/409."""
+    tenant = provisioning.provision_tenant(
+        name=data.name,
+        slug=data.slug,
+        domain=data.domain,
+        owner_email=data.owner_email,
+        owner_password=data.owner_password,
+        modules=data.modules,
+        actor_id=request.auth.id,
+    )
+    record_platform(
+        request.auth, "tenant.created", target=data.slug, detail={"modules": list(data.modules)}
+    )
+    return Status(201, _tenant_view(tenant))
+
+
+@router.patch("/tenants/{slug}", auth=platform_auth, response=TenantOut)
+def rename_tenant(request, slug: str, data: TenantRenameIn):
+    """Rename a tenant."""
+    tenant = _get_tenant_or_404(slug)
+    tenant.name = data.name
+    tenant.save(update_fields=["name"])
+    record_platform(request.auth, "tenant.renamed", target=slug, detail={"name": data.name})
+    return _tenant_view(tenant)
+
+
+@router.post("/tenants/{slug}/suspend", auth=platform_auth, response=TenantOut)
+def suspend_tenant(request, slug: str):
+    """Suspend a tenant (blocks its login, API and docs)."""
+    tenant = _get_tenant_or_404(slug)
+    tops.suspend(tenant)
+    record_platform(request.auth, "tenant.suspended", target=slug)
+    return _tenant_view(tenant)
+
+
+@router.post("/tenants/{slug}/resume", auth=platform_auth, response=TenantOut)
+def resume_tenant(request, slug: str):
+    """Resume a suspended tenant."""
+    tenant = _get_tenant_or_404(slug)
+    tops.resume(tenant)
+    record_platform(request.auth, "tenant.resumed", target=slug)
+    return _tenant_view(tenant)
+
+
+@router.delete("/tenants/{slug}", auth=platform_auth, response={204: None})
+def delete_tenant(request, slug: str, confirm_slug: str = ""):
+    """Delete a suspended tenant (requires confirm_slug == slug); keeps the people."""
+    tenant = _get_tenant_or_404(slug)
+    tops.delete_tenant(tenant, confirm_slug)
+    record_platform(request.auth, "tenant.deleted", target=slug)
+    return Status(204, None)

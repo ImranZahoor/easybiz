@@ -50,3 +50,16 @@ class OverviewOut(Schema):
     tenants_suspended: int
     platform_admins: int
     modules_installed: int
+
+
+class TenantCreateIn(Schema):
+    name: str
+    slug: str
+    domain: str
+    owner_email: str
+    owner_password: str | None = None
+    modules: list[str] = []
+
+
+class TenantRenameIn(Schema):
+    name: str
