@@ -68,3 +68,28 @@ class TenantRenameIn(Schema):
 class DomainIn(Schema):
     domain: str
     is_primary: bool = False
+
+
+class ModulePermOut(Schema):
+    code: str
+    description: str = ""
+
+
+class ModuleCatalogOut(Schema):
+    id: str
+    name: str
+    code_version: str | None = None
+    catalog_version: str | None = None
+    state: str
+    requires: list[str]
+    optional: list[str]
+    provides: list
+    publishes: list[str]
+    subscribes: list[str]
+    permissions: list[ModulePermOut]
+    tenants_enabled: int
+    tenants_disabled: int
+
+
+class ModulesOut(Schema):
+    modules: list[str]
