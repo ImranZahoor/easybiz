@@ -4,7 +4,7 @@ from uuid import UUID
 
 from django.db.models import Sum
 
-from easybiz.modules.timesheets.models import Entry, Project
+from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
 from easybiz.modules.timesheets.types import EntryOut, ProjectOut
 
 # --- public reads (return DTOs; nothing ORM-shaped reaches the handler) ------
@@ -31,7 +31,7 @@ def entries_for(
 
 def approved_hours(user_id: UUID, start: date, end: date) -> Decimal:
     total = Entry.objects.filter(
-        user_id=user_id, status=Entry.APPROVED, work_date__gte=start, work_date__lte=end
+        user_id=user_id, status=EntryStatus.APPROVED, work_date__gte=start, work_date__lte=end
     ).aggregate(total=Sum("hours"))["total"]
     return total or Decimal("0")
 

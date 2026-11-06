@@ -13,7 +13,7 @@ END = datetime.date(2026, 11, 30)
 
 
 def _seed(tenant):
-    from easybiz.modules.timesheets.models import Entry, Project
+    from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
 
     with tenant_context(tenant):
         p = Project.objects.create(code="CPRJ", name="C")
@@ -29,12 +29,12 @@ def _seed(tenant):
                 status=status,
             )
 
-        mk(3, "8.00", Entry.APPROVED)  # counts
-        mk(4, "4.50", Entry.APPROVED)  # counts
-        mk(5, "8.00", Entry.DRAFT)  # not approved
-        mk(6, "8.00", Entry.SUBMITTED)  # not approved
-        mk(7, "8.00", Entry.REJECTED)  # not approved
-        mk(99, "8.00", Entry.APPROVED)  # approved but out of range (December)
+        mk(3, "8.00", EntryStatus.APPROVED)  # counts
+        mk(4, "4.50", EntryStatus.APPROVED)  # counts
+        mk(5, "8.00", EntryStatus.DRAFT)  # not approved
+        mk(6, "8.00", EntryStatus.SUBMITTED)  # not approved
+        mk(7, "8.00", EntryStatus.REJECTED)  # not approved
+        mk(99, "8.00", EntryStatus.APPROVED)  # approved but out of range (December)
 
 
 def test_approved_hours_sums_only_in_range_approved(synced, db_tenant):

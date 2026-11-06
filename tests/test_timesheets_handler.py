@@ -11,7 +11,7 @@ USER = "33333333-3333-3333-3333-333333333333"
 
 
 def _seed_entries(tenant):
-    from easybiz.modules.timesheets.models import Entry, Project
+    from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
 
     with tenant_context(tenant):
         p = Project.objects.create(code="HPRJ", name="H")
@@ -22,12 +22,12 @@ def _seed_entries(tenant):
             hours=Decimal("8.00"),
             status=st,
         )
-        return mk(Entry.DRAFT), mk(Entry.SUBMITTED), mk(Entry.APPROVED)
+        return mk(EntryStatus.DRAFT), mk(EntryStatus.SUBMITTED), mk(EntryStatus.APPROVED)
 
 
 def test_membership_removed_drops_only_drafts_idempotently(synced, db_tenant):
     lifecycle.enable_module(db_tenant, "timesheets")
-    from easybiz.modules.timesheets.models import Entry
+    from easybiz.modules.timesheets.models import Entry, EntryStatus
 
     draft, submitted, approved = _seed_entries(db_tenant)
     with tenant_context(db_tenant):
@@ -45,7 +45,7 @@ def test_membership_removed_drops_only_drafts_idempotently(synced, db_tenant):
             project_id=submitted.project_id,
             work_date=datetime.date(2026, 11, 4),
             hours=Decimal("4.00"),
-            status=Entry.DRAFT,
+            status=EntryStatus.DRAFT,
         )
         ev.status = OutboxEvent.PENDING
         ev.next_attempt_at = ev.created_at

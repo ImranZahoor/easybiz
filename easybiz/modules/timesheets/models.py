@@ -3,6 +3,15 @@ import uuid
 from django.db import models
 
 
+class EntryStatus(models.TextChoices):
+    """The lifecycle states of a time entry (single source of truth for the field)."""
+
+    DRAFT = "draft", "Draft"
+    SUBMITTED = "submitted", "Submitted"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+
+
 class Project(models.Model):
     """A billable/trackable project; code is stored uppercase and unique."""
 
@@ -16,15 +25,15 @@ class Project(models.Model):
 class Entry(models.Model):
     """A user's time entry against a project, moving draft → submitted → approved/rejected."""
 
-    DRAFT, SUBMITTED, APPROVED, REJECTED = "draft", "submitted", "approved", "rejected"
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user_id = models.UUIDField(db_index=True)
     project = models.ForeignKey(Project, on_delete=models.PROTECT)
     work_date = models.DateField(db_index=True)
     hours = models.DecimalField(max_digits=4, decimal_places=2)
     note = models.CharField(max_length=300, blank=True, default="")
-    status = models.CharField(max_length=10, db_index=True, default=DRAFT)
+    status = models.CharField(
+        max_length=10, db_index=True, choices=EntryStatus.choices, default=EntryStatus.DRAFT
+    )
     reviewed_by = models.UUIDField(null=True, blank=True)
     review_note = models.CharField(max_length=300, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
