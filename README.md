@@ -6,6 +6,16 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**M7 (platform admin API) — complete.** The operator plane on the public host:
+`PlatformJWTAuth` (public-host-only, `scope="platform"` tokens, `is_platform_admin`
+read live so demotion is immediate), throttled `POST /api/platform/auth/login`, and
+`/api/platform/*` — overview, tenants (list/detail/create/rename/suspend/resume/delete,
+with all-or-nothing provisioning and `confirm_slug` delete), domains, per-tenant module
+toggles, the module catalog with `sync`/`upgrade`, platform admins (add/promote/remove
+with self + last-admin guards) and the platform audit log. Every mutation is recorded via
+`record_platform` (`tenancy_platformauditlog`). Bootstrap with `create_platform_admin`;
+platform docs at `http://localhost:8000/api/platform/docs`.
+
 **M6 (Timesheets reference module) — complete.** The first full business module,
 proving the module contract end to end: `timesheets_project`/`timesheets_entry`
 tables (created only when enabled), `/api/timesheets` endpoints — projects
@@ -40,10 +50,9 @@ remove-data), roles (list/create), users (list/create/delete), audit. Backed by
 `users`/`iam`/`audit` services and the core permission catalogue. Builds on M3
 (module system + provisioning) and M0–M2 (skeleton, tenancy/identity, kernel).
 
-Next: **M7** (platform admin API). Multiple auth methods (2FA, magic link,
-social/SSO, refresh tokens) are deferred to
-**F13**; role inheritance to **F14**; Celery-backed dispatch, delivery leases, and
-retention to **F15**.
+Next: **M8** (CORS + API docs polish) and **M9** (full verification). Multiple auth
+methods (2FA, magic link, social/SSO, refresh tokens) are deferred to **F13**; role
+inheritance to **F14**; Celery-backed dispatch, delivery leases, and retention to **F15**.
 
 ## Prerequisites
 
@@ -91,11 +100,17 @@ uv run manage.py provision_tenant acme --domain acme.localhost \
 uv run manage.py tenant_module acme enable demo       # per-tenant enable/disable/remove
 uv run manage.py upgrade_modules              # after deploying new module code
 uv run manage.py run_dispatcher               # deliver outbox events (add --once for a single sweep)
+uv run manage.py create_platform_admin --email ops@easybiz.test --password change-me-now  # bootstrap operator
 ```
 
 The tenant API is served per tenant host (e.g. `http://acme.localhost:8000/api/`):
 `POST /api/auth/login` → token, then `Authorization: Bearer <token>` for
 `/api/auth/me` and `/api/core/*`. Interactive docs at `http://<tenant>/api/docs`.
+
+The platform (operator) API is served on the platform host (`http://localhost:8000`):
+`POST /api/platform/auth/login` → token, then `/api/platform/*` (tenants, domains,
+modules, admins, audit). Docs at `http://localhost:8000/api/platform/docs`. Create the
+first operator with `create_platform_admin`.
 
 ## Conventions
 
