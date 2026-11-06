@@ -7,6 +7,7 @@ from easybiz.core.audit import service as audit
 from easybiz.core.errors import DomainError
 from easybiz.core.events import service as events
 from easybiz.modules.timesheets import queries
+from easybiz.modules.timesheets.enums import EntryStatus
 from easybiz.modules.timesheets.models import Entry, Project
 from easybiz.modules.timesheets.types import (
     CreateEntryParams,
@@ -58,33 +59,33 @@ def submit_entry(params: SubmitEntryParams) -> EntryOut:
     entry = queries.own_entry(params.user_id, params.entry_id)
     if entry is None:
         raise TimesheetError("entry not found", 404)
-    if entry.status not in (Entry.DRAFT, Entry.REJECTED):
+    if entry.status not in (EntryStatus.DRAFT, EntryStatus.REJECTED):
         raise TimesheetError(f"cannot submit a {entry.status} entry", 409)
-    entry.status = Entry.SUBMITTED
+    entry.status = EntryStatus.SUBMITTED
     entry.save(update_fields=["status"])
     return EntryOut.of(entry)
 
 
 def approve_entry(params: ReviewEntryParams) -> EntryOut:
     """Approve a submitted entry (not the reviewer's own); publishes timesheets.entry.approved."""
-    return _review(params, Entry.APPROVED, "timesheets.entry.approved")
+    return _review(params, EntryStatus.APPROVED, "timesheets.entry.approved")
 
 
 def reject_entry(params: ReviewEntryParams) -> EntryOut:
     """Reject a submitted entry (not the reviewer's own); publishes timesheets.entry.rejected."""
-    return _review(params, Entry.REJECTED, "timesheets.entry.rejected")
+    return _review(params, EntryStatus.REJECTED, "timesheets.entry.rejected")
 
 
 def drop_user_drafts(user_id: UUID) -> None:
     """Delete a user's draft entries; submitted/approved/rejected time is kept."""
-    Entry.objects.filter(user_id=user_id, status=Entry.DRAFT).delete()
+    Entry.objects.filter(user_id=user_id, status=EntryStatus.DRAFT).delete()
 
 
 def _review(params: ReviewEntryParams, new_status: str, event_name: str) -> EntryOut:
     entry = queries.entry(params.entry_id)
     if entry is None:
         raise TimesheetError("entry not found", 404)
-    if entry.status != Entry.SUBMITTED:
+    if entry.status != EntryStatus.SUBMITTED:
         raise TimesheetError(f"entry is {entry.status}, not submitted", 409)
     if entry.user_id == params.reviewer_id:
         raise TimesheetError("cannot review your own time", 403)
