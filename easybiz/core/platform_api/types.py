@@ -63,3 +63,8 @@ class TenantCreateIn(Schema):
 
 class TenantRenameIn(Schema):
     name: str
+
+
+class DomainIn(Schema):
+    domain: str
+    is_primary: bool = False

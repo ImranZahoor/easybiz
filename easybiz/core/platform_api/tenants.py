@@ -9,6 +9,7 @@ from easybiz.core.catalog.models import Module, TenantModule
 from easybiz.core.kernel import provisioning
 from easybiz.core.kernel import tenants as tops
 from easybiz.core.platform_api.types import (
+    DomainIn,
     DomainOut,
     OverviewOut,
     TenantCreateIn,
@@ -142,3 +143,23 @@ def delete_tenant(request, slug: str, confirm_slug: str = ""):
     tops.delete_tenant(tenant, confirm_slug)
     record_platform(request.auth, "tenant.deleted", target=slug)
     return Status(204, None)
+
+
+@router.post("/tenants/{slug}/domains", auth=platform_auth, response={201: TenantOut})
+def add_tenant_domain(request, slug: str, data: DomainIn):
+    """Attach a domain to a tenant (409 duplicate, 422 invalid)."""
+    tenant = _get_tenant_or_404(slug)
+    tops.add_domain(tenant, data.domain, is_primary=data.is_primary)
+    record_platform(
+        request.auth, "tenant.domain_added", target=slug, detail={"domain": data.domain}
+    )
+    return Status(201, _tenant_view(tenant))
+
+
+@router.delete("/tenants/{slug}/domains/{domain}", auth=platform_auth, response=TenantOut)
+def remove_tenant_domain(request, slug: str, domain: str):
+    """Detach a domain (409 if it is the last, 422 if not a domain of the tenant)."""
+    tenant = _get_tenant_or_404(slug)
+    tops.remove_domain(tenant, domain)
+    record_platform(request.auth, "tenant.domain_removed", target=slug, detail={"domain": domain})
+    return _tenant_view(tenant)
