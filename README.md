@@ -52,13 +52,28 @@ retention to **F15**.
 
 ## Setup
 
+Quick path — the scripts in `scripts/` wrap the steps below (all idempotent):
+
+```bash
+./scripts/setup.sh               # db up, deps, .env, shared migrations, platform tenant + catalog
+./scripts/tenant.sh acme         # provision a test tenant at acme.localhost (modules: timesheets)
+./scripts/run.sh                 # dev server; add --with-dispatcher to also deliver outbox events
+```
+
+Then open `http://acme.localhost:8000/api/docs`, log in as `owner@acme.test` / `change-me-now`,
+click **Authorize** with the returned token, and exercise `/api/core/*` and `/api/timesheets/*`.
+`./scripts/tenant.sh <slug> <modules>` provisions other tenants (override the owner via
+`OWNER_EMAIL`/`OWNER_PASSWORD`).
+
+The equivalent manual steps:
+
 ```bash
 docker compose up -d db          # PostgreSQL 16 on localhost:5432 (db "easybiz") — required for tests
 uv sync                          # install deps into .venv
 cp .env.example .env             # adjust secrets/hosts per environment
 uv run manage.py check           # system checks must pass
 uv run manage.py migrate_schemas --shared   # apply shared migrations to the public schema
-uv run manage.py init_platform              # create the public tenant + localhost domain
+uv run manage.py init_platform              # create the public tenant + localhost domain + module catalog
 ```
 
 ## Common commands
