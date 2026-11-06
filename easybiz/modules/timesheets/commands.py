@@ -7,7 +7,8 @@ from easybiz.core.audit import service as audit
 from easybiz.core.errors import DomainError
 from easybiz.core.events import service as events
 from easybiz.modules.timesheets import queries
-from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
+from easybiz.modules.timesheets.enums import EntryStatus
+from easybiz.modules.timesheets.models import Entry, Project
 from easybiz.modules.timesheets.types import (
     CreateEntryParams,
     CreateProjectParams,

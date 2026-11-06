@@ -2,14 +2,7 @@ import uuid
 
 from django.db import models
 
-
-class EntryStatus(models.TextChoices):
-    """The lifecycle states of a time entry (single source of truth for the field)."""
-
-    DRAFT = "draft", "Draft"
-    SUBMITTED = "submitted", "Submitted"
-    APPROVED = "approved", "Approved"
-    REJECTED = "rejected", "Rejected"
+from easybiz.modules.timesheets.enums import EntryStatus
 
 
 class Project(models.Model):
@@ -32,7 +25,7 @@ class Entry(models.Model):
     hours = models.DecimalField(max_digits=4, decimal_places=2)
     note = models.CharField(max_length=300, blank=True, default="")
     status = models.CharField(
-        max_length=10, db_index=True, choices=EntryStatus.choices, default=EntryStatus.DRAFT
+        max_length=10, db_index=True, choices=EntryStatus.choices(), default=EntryStatus.DRAFT.value
     )
     reviewed_by = models.UUIDField(null=True, blank=True)
     review_note = models.CharField(max_length=300, blank=True, default="")

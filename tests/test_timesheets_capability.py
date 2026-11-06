@@ -13,7 +13,8 @@ END = datetime.date(2026, 11, 30)
 
 
 def _seed(tenant):
-    from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
+    from easybiz.modules.timesheets.enums import EntryStatus
+    from easybiz.modules.timesheets.models import Entry, Project
 
     with tenant_context(tenant):
         p = Project.objects.create(code="CPRJ", name="C")

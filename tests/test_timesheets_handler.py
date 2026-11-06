@@ -11,7 +11,8 @@ USER = "33333333-3333-3333-3333-333333333333"
 
 
 def _seed_entries(tenant):
-    from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
+    from easybiz.modules.timesheets.enums import EntryStatus
+    from easybiz.modules.timesheets.models import Entry, Project
 
     with tenant_context(tenant):
         p = Project.objects.create(code="HPRJ", name="H")
@@ -27,7 +28,8 @@ def _seed_entries(tenant):
 
 def test_membership_removed_drops_only_drafts_idempotently(synced, db_tenant):
     lifecycle.enable_module(db_tenant, "timesheets")
-    from easybiz.modules.timesheets.models import Entry, EntryStatus
+    from easybiz.modules.timesheets.enums import EntryStatus
+    from easybiz.modules.timesheets.models import Entry
 
     draft, submitted, approved = _seed_entries(db_tenant)
     with tenant_context(db_tenant):

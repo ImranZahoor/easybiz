@@ -6,6 +6,8 @@ from uuid import UUID
 
 from ninja import Schema
 
+from easybiz.modules.timesheets.enums import EntryStatus
+
 # --- Projects ----------------------------------------------------------------
 
 
@@ -79,7 +81,7 @@ class EntryOut(Schema):
     work_date: str
     hours: str
     note: str
-    status: str
+    status: EntryStatus
 
     @classmethod
     def of(cls, entry) -> EntryOut:

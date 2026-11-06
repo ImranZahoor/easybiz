@@ -13,15 +13,17 @@ def _enable(db_tenant):
 
 
 def test_status_field_derives_choices_from_enum():
-    from easybiz.modules.timesheets.models import Entry, EntryStatus
+    from easybiz.modules.timesheets.enums import EntryStatus
+    from easybiz.modules.timesheets.models import Entry
 
-    assert Entry._meta.get_field("status").choices == EntryStatus.choices  # single source
+    assert Entry._meta.get_field("status").choices == EntryStatus.choices()  # single source
     assert EntryStatus.DRAFT == "draft"  # str-valued enum serializes transparently
 
 
 def test_project_and_entry_persist(synced, db_tenant):
     _enable(db_tenant)
-    from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
+    from easybiz.modules.timesheets.enums import EntryStatus
+    from easybiz.modules.timesheets.models import Entry, Project
 
     with tenant_context(db_tenant):
         p = Project.objects.create(code="ALPHA", name="Alpha")
@@ -37,7 +39,8 @@ def test_project_and_entry_persist(synced, db_tenant):
 
 def test_hours_range_constraint(synced, db_tenant):
     _enable(db_tenant)
-    from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
+    from easybiz.modules.timesheets.enums import EntryStatus
+    from easybiz.modules.timesheets.models import Entry, Project
 
     with tenant_context(db_tenant):
         p = Project.objects.create(code="BETA", name="Beta")

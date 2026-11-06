@@ -4,7 +4,8 @@ from uuid import UUID
 
 from django.db.models import Sum
 
-from easybiz.modules.timesheets.models import Entry, EntryStatus, Project
+from easybiz.modules.timesheets.enums import EntryStatus
+from easybiz.modules.timesheets.models import Entry, Project
 from easybiz.modules.timesheets.types import EntryOut, ProjectOut
 
 # --- public reads (return DTOs; nothing ORM-shaped reaches the handler) ------
