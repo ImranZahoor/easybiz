@@ -52,6 +52,42 @@ def _reset_capabilities():
     capabilities._providers.update(saved)
 
 
+@pytest.fixture(autouse=True)
+def _reset_cache():
+    """Clear the cache each test so the platform-login throttle starts fresh."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+
+
+@pytest.fixture
+def admin():
+    """A platform admin plus a platform token (logged in on the public host)."""
+    from django.test import Client
+
+    from easybiz.core.users.models import User
+
+    email = "admin@platform.test"
+    user = User.objects.filter(email=email).first()
+    if user is None:
+        user = User.objects.create_user(
+            email=email, password="change-me-now", is_platform_admin=True
+        )
+    token = (
+        Client()
+        .post(
+            "/api/platform/auth/login",
+            data={"email": email, "password": "change-me-now"},
+            content_type="application/json",
+            HTTP_HOST="localhost",
+        )
+        .json()["access_token"]
+    )
+    yield user, token
+    User.objects.filter(email=email).delete()
+
+
 @pytest.fixture
 def tables_in():
     def _tables_in(schema: str) -> set[str]:
