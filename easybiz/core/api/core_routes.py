@@ -5,8 +5,17 @@ from ninja import Router
 from ninja.errors import HttpError
 from ninja.responses import Status
 
-from easybiz.core.api.security import perm
-from easybiz.core.api.types import AuditOut, ModuleOut, RoleIn, RoleOut, UserIn, UserOut
+from easybiz.core.api.security import authenticated, perm
+from easybiz.core.api.types import (
+    AuditOut,
+    ContextOut,
+    ModuleOut,
+    RoleIn,
+    RoleOut,
+    TenantSummary,
+    UserIn,
+    UserOut,
+)
 from easybiz.core.audit import service as audit
 from easybiz.core.audit.models import AuditLog
 from easybiz.core.catalog.models import TenantModule
@@ -19,6 +28,16 @@ from easybiz.core.users import service as users
 from easybiz.core.users.models import Membership
 
 router = Router()
+
+
+@router.get("/context", auth=authenticated, response=ContextOut)
+def context(request):
+    """Tenant bootstrap for any signed-in user: the tenant and its enabled modules."""
+    tenant = request.tenant
+    return ContextOut(
+        tenant=TenantSummary(slug=tenant.slug, name=tenant.name),
+        enabled_modules=sorted(state.enabled_module_ids(tenant)),
+    )
 
 
 def _module_view(tenant, module_id: str) -> ModuleOut:
