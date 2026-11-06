@@ -11,18 +11,18 @@ from easybiz.core.kernel.routers import module_has_tables
 
 
 class Command(MigrateCommand):
-    """Per-schema migrate that hides modules a tenant schema lacks, so Django records no
-    migration state for them there (closes pitfall P2).
+    """Migrate one schema, skipping modules it hasn't installed.
 
-    On the public schema modules are NOT hidden: the router still keeps their tables out of
-    public, but their migrations get no-op-recorded (like the core tenant apps), so a stock
-    ``runserver`` migration check does not report them as unapplied. Public never enables a
-    module, and ``django_migrations`` is per-schema, so this cannot affect a tenant's enable.
+    A tenant gets a module's tables only once it enables the module. Until then we hide that
+    module's migrations, or Django would record them as done and refuse to build the tables on
+    enable. Public keeps every module visible (it owns none of their tables either way) so
+    ``runserver`` doesn't flag them as unapplied.
     """
 
     def handle(self, *args, **options):
         schema = getattr(connection, "schema_name", None) or get_public_schema_name()
         public = schema == get_public_schema_name()
+        # Hide a module's migrations only in a tenant schema that doesn't have its tables yet.
         hidden = {
             module_id: None
             for module_id in registry.module_ids()
