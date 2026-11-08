@@ -50,7 +50,14 @@ remove-data), roles (list/create), users (list/create/delete), audit. Backed by
 `users`/`iam`/`audit` services and the core permission catalogue. Builds on M3
 (module system + provisioning) and M0–M2 (skeleton, tenancy/identity, kernel).
 
-Next: **M8** (CORS + API docs polish) and **M9** (full verification). Multiple auth
+**M8 (CORS) — complete.** `CorsMiddleware` runs first so preflights are answered
+before tenant/module resolution (no token or enabled module required); actual and
+error responses carry CORS headers; `EASYBIZ_CORS_ORIGINS` sets allowed origins and,
+in `DEBUG`, `localhost`/`*.localhost`/`127.0.0.1` on any port are allowed while unknown
+origins are not. Credentials are off (Bearer tokens). (The module-app "unapplied
+migration" notice was already resolved in the migrate command.)
+
+Next: **M9** (full verification). Multiple auth
 methods (2FA, magic link, social/SSO, refresh tokens) are deferred to **F13**; role
 inheritance to **F14**; Celery-backed dispatch, delivery leases, and retention to **F15**.
 
