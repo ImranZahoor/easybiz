@@ -57,9 +57,16 @@ in `DEBUG`, `localhost`/`*.localhost`/`127.0.0.1` on any port are allowed while 
 origins are not. Credentials are off (Bearer tokens). (The module-app "unapplied
 migration" notice was already resolved in the migrate command.)
 
-Next: **M9** (full verification). Multiple auth
-methods (2FA, magic link, social/SSO, refresh tokens) are deferred to **F13**; role
-inheritance to **F14**; Celery-backed dispatch, delivery leases, and retention to **F15**.
+**Part A (M0–M9) — complete and verified.** The full gate is green — `uv run pytest`
+(217 on real PostgreSQL), `manage.py check`, `makemigrations --check`, `ruff`, `mypy` —
+and a live end-to-end operator run passes: create a platform admin, create a tenant over
+HTTP, the owner logs in on the tenant host, enable a module, suspend (tenant login then
+403), and delete (schema dropped, 404 after) — every step audited in order.
+
+Next is **Part B** (F1–F22): HR and Payroll (to prove cross-module dependencies and
+capabilities), then settings/flags, events v2, jobs, and the rest. Multiple auth methods
+(2FA, magic link, social/SSO, refresh tokens) are deferred to **F13**; role inheritance to
+**F14**; Celery-backed dispatch, delivery leases, and retention to **F15**.
 
 ## Prerequisites
 
