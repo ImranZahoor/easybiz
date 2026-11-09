@@ -104,11 +104,19 @@ def permission_groups(tenant) -> list[dict]:
     return [{"module": m, "permissions": perms} for m, perms in sorted(groups.items())]
 
 
-def _get_role(role_id) -> Role:
+def get_role(role_id) -> Role:
     role = Role.objects.filter(id=role_id).first()
     if role is None:
         raise DomainError("role not found", 404)
     return role
+
+
+def list_roles() -> list[Role]:
+    return list(Role.objects.order_by("name"))
+
+
+def user_role_names(user_id) -> list[str]:
+    return sorted(UserRole.objects.filter(user_id=user_id).values_list("role__name", flat=True))
 
 
 def _assert_assignable(tenant, perms) -> None:
@@ -170,7 +178,7 @@ def create_role(tenant, name: str, permissions, description: str = "", actor_per
 
 def update_role(tenant, role_id, *, actor_id, actor_perms, changes: dict) -> Role:
     """Apply only the provided fields (name/description/permissions/parent) with guards."""
-    role = _get_role(role_id)
+    role = get_role(role_id)
     before = _snapshot(role)
     if role.is_system and set(changes) - {"description"}:
         raise RoleError("a system role allows only a description change")
@@ -202,7 +210,7 @@ def update_role(tenant, role_id, *, actor_id, actor_perms, changes: dict) -> Rol
 
 def delete_role(role_id, *, force: bool, actor_id) -> None:
     """Delete a non-system role; refuse if still assigned unless ``force``."""
-    role = _get_role(role_id)
+    role = get_role(role_id)
     if role.is_system:
         raise DomainError("a system role cannot be deleted", 409)
     if UserRole.objects.filter(role=role).exists() and not force:
@@ -215,7 +223,7 @@ def delete_role(role_id, *, force: bool, actor_id) -> None:
 
 def clone_role(tenant, role_id, new_name: str, *, actor_id, actor_perms) -> Role:
     """Duplicate a role's own permissions + parent under a new name, grant-guarded."""
-    src = _get_role(role_id)
+    src = get_role(role_id)
     own = list(src.permissions.values_list("permission", flat=True))
     _assert_assignable(tenant, own)
     _assert_grantable(effective_codes(src), actor_perms)  # includes inherited, to block escalation

@@ -28,7 +28,7 @@ from easybiz.core.audit.models import AuditLog
 from easybiz.core.catalog.models import TenantModule
 from easybiz.core.events import service as events
 from easybiz.core.iam import service as iam
-from easybiz.core.iam.models import Role, UserRole
+from easybiz.core.iam.models import UserRole
 from easybiz.core.kernel import lifecycle, state
 from easybiz.core.kernel.registry import registry
 from easybiz.core.users import service as users
@@ -121,7 +121,7 @@ def _role_view(role) -> RoleOut:
 
 @router.get("/roles", auth=perm("core.role.read"), response=list[RoleOut])
 def list_roles(request):
-    return [_role_view(r) for r in Role.objects.order_by("name")]
+    return [_role_view(r) for r in iam.list_roles()]
 
 
 @router.get("/permissions", auth=perm("core.role.read"), response=list[PermissionGroupOut])
@@ -133,9 +133,7 @@ def list_permissions(request):
 @router.get("/roles/{role_id}", auth=perm("core.role.read"), response=RoleDetailOut)
 def get_role(request, role_id: UUID):
     """One role with its parent and effective (own + inherited) permissions."""
-    role = Role.objects.filter(id=role_id).first()
-    if role is None:
-        raise HttpError(404, "role not found")
+    role = iam.get_role(role_id)
     return RoleDetailOut(
         id=str(role.id),
         name=role.name,
@@ -194,8 +192,7 @@ def clone_role(request, role_id: str, data: RoleCloneIn):
 
 
 def _user_view(user) -> UserOut:
-    role_names = UserRole.objects.filter(user_id=user.id).values_list("role__name", flat=True)
-    return UserOut(id=str(user.id), email=user.email, roles=sorted(role_names))
+    return UserOut(id=str(user.id), email=user.email, roles=iam.user_role_names(user.id))
 
 
 @router.get("/users", auth=perm("core.user.read"), response=list[UserOut])
