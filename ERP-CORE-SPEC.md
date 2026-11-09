@@ -1449,7 +1449,7 @@ Sketch of the **manifest v2** additions (F17), shown only for the new keys:
 | `core.org.unit.created` / `.updated` / `.moved` / `.deactivated` | core | `{unit_id, ...}` | planned (F3) |
 | `core.party.changed`, `core.item.changed` | core | `{id, change}` | planned (F4) |
 | `core.workflow.completed` | core | `{instance_id, key, entity_module, entity_type, entity_id, outcome}` | planned (F8) |
-| `core.role.changed` | core | `{role_id}` | planned (F14) |
+| `core.role.changed` | core | `{role}` or `{user}` (a role or an assignment changed) | current |
 | `platform.tenant.created` / `.suspended` / `.deleted` | platform (public schema, not the tenant outbox) | `{slug}` | planned (F16) |
 
 ## Appendix E. Error code catalogue (planned with F21; `detail` stays human-readable)
