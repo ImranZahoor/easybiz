@@ -45,6 +45,18 @@ def test_assign_escalation_blocked(synced, provision):
     assert r.status_code == 422
 
 
+def test_delete_last_owner_blocked(synced, provision):
+    _owner(provision, "ur4")
+    tenant = Tenant.objects.get(slug="ur4")
+    admin_tok = _limited_token(tenant, ["core.user.read", "core.user.manage"])  # non-owner admin
+    with tenant_context(tenant):
+        owner_uid = str(
+            UserRole.objects.filter(role__name="owner").values_list("user_id", flat=True)[0]
+        )
+    # deleting the sole owner would orphan the tenant -> refused
+    assert _req("delete", f"/api/core/users/{owner_uid}", admin_tok, "ur4").status_code == 409
+
+
 def test_last_owner_cannot_be_demoted(synced, provision):
     token = _owner(provision, "ur3")
     tenant = Tenant.objects.get(slug="ur3")

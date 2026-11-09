@@ -11,13 +11,13 @@ def _schema() -> str:
 
 
 def role_version() -> int:
-    """A per-schema counter bumped by any role or assignment change."""
-    return cast("int", cache.get_or_set(f"iam:ver:{_schema()}", 1))
+    """A per-schema counter bumped by any role or assignment change (never expires)."""
+    return cast("int", cache.get_or_set(f"iam:ver:{_schema()}", 1, timeout=None))
 
 
 def bump_role_version() -> None:
-    """Invalidate every cached permission set for this schema."""
-    cache.set(f"iam:ver:{_schema()}", role_version() + 1)
+    """Invalidate every cached permission set for this schema (monotonic, non-expiring)."""
+    cache.set(f"iam:ver:{_schema()}", role_version() + 1, timeout=None)
 
 
 def cached_permissions_for(user_id) -> set[str]:

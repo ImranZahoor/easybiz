@@ -233,6 +233,8 @@ def delete_user(request, user_id: str):
     membership = Membership.objects.filter(tenant=request.tenant, user_id=user_id).first()
     if membership is None:
         raise HttpError(404, "user is not a member of this tenant")
+    if iam.would_orphan_owner(user_id):
+        raise HttpError(409, "cannot remove the last owner")
     UserRole.objects.filter(user_id=user_id).delete()
     membership.delete()
     events.publish("core.membership.removed", {"user_id": user_id})

@@ -136,6 +136,19 @@ def test_delete_rules_and_events(synced, provision):
         assert OutboxEvent.objects.filter(name="core.role.changed").exists()
 
 
+def test_parent_change_cannot_escalate(synced, provision):
+    _owner(provision, "rw7")
+    tenant = Tenant.objects.get(slug="rw7")
+    limited = _limited_token(tenant, ["core.role.read", "core.role.manage"])
+    _req("post", "/api/core/roles", limited, "rw7", {"name": "r", "permissions": []})
+    rid = _role_id("rw7", limited, "r")
+    # a role-manager who lacks '*' cannot make a role inherit owner's '*' via parent
+    assert (
+        _req("patch", f"/api/core/roles/{rid}", limited, "rw7", {"parent": "owner"}).status_code
+        == 422
+    )
+
+
 def test_clone_role(synced, provision):
     token = _owner(provision, "rw6")
     _req(

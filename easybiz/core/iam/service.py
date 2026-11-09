@@ -184,6 +184,9 @@ def update_role(tenant, role_id, *, actor_id, actor_perms, changes: dict) -> Rol
         new_parent = _resolve_parent(changes["parent"])
         if would_cycle(role, new_parent):
             raise RoleError("parent would create an inheritance cycle")
+        if new_parent is not None:
+            # inheriting a parent grants its permissions, so the actor must hold them
+            _assert_grantable(effective_codes(new_parent), actor_perms)
         role.parent = new_parent
     role.save()
     if "permissions" in changes:
@@ -250,6 +253,11 @@ def _owner_lost(user_id, new_role_names) -> bool:
     if not has_owner or "owner" in new_role_names:
         return False
     return not UserRole.objects.filter(role__name="owner").exclude(user_id=user_id).exists()
+
+
+def would_orphan_owner(user_id) -> bool:
+    """True if removing this user entirely would leave the tenant with no owner."""
+    return _owner_lost(user_id, set())
 
 
 def _announce_user(actor_id, action: str, user_id) -> None:
