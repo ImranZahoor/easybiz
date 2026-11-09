@@ -83,6 +83,10 @@ class UserOut(Schema):
     roles: list[str]
 
 
+class UserRolesIn(Schema):
+    roles: list[str]
+
+
 class AuditOut(Schema):
     at: str
     actor_id: str | None

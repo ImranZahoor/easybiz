@@ -218,12 +218,60 @@ def ensure_roles_exist(role_names) -> None:
         raise RoleError(f"unknown roles: {sorted(missing)}")
 
 
-def set_user_roles(user_id, role_names) -> None:
-    """Replace the user's role set in the current tenant (RoleError on unknown role)."""
+def _assert_can_assign(role_names, actor_perms) -> None:
+    """You can only assign a role whose effective permissions you already hold."""
+    if actor_perms is None or "*" in actor_perms:
+        return
+    for role in Role.objects.filter(name__in=role_names):
+        if any(not has_permission(actor_perms, c) for c in effective_codes(role)):
+            raise RoleError(f"cannot assign role {role.name!r}: it grants permissions you lack")
+
+
+def _owner_lost(user_id, new_role_names) -> bool:
+    """True if this change strips the last remaining holder of the ``owner`` role."""
+    has_owner = UserRole.objects.filter(user_id=user_id, role__name="owner").exists()
+    if not has_owner or "owner" in new_role_names:
+        return False
+    return not UserRole.objects.filter(role__name="owner").exclude(user_id=user_id).exists()
+
+
+def _announce_user(actor_id, action: str, user_id) -> None:
+    audit.record(actor_id, action, entity="user", entity_id=str(user_id))
+    events.publish("core.role.changed", {"user": str(user_id)}, producer="core")
+
+
+def set_user_roles(user_id, role_names, *, actor_id=None, actor_perms=None) -> None:
+    """Replace the user's role set, with assign-escalation and last-owner guards."""
     names = list(role_names)
     roles = list(Role.objects.filter(name__in=names))
     missing = set(names) - {r.name for r in roles}
     if missing:
         raise RoleError(f"unknown roles: {sorted(missing)}")
+    _assert_can_assign(names, actor_perms)
+    if _owner_lost(user_id, names):
+        raise DomainError("cannot remove the last owner", 409)
     UserRole.objects.filter(user_id=user_id).delete()
     UserRole.objects.bulk_create([UserRole(user_id=user_id, role=r) for r in roles])
+    _announce_user(actor_id, "user.roles_set", user_id)
+
+
+def add_user_role(user_id, role_name, *, actor_id=None, actor_perms=None) -> None:
+    """Grant one role to a user (assign-escalation guarded)."""
+    role = Role.objects.filter(name=role_name).first()
+    if role is None:
+        raise RoleError(f"unknown role {role_name!r}")
+    _assert_can_assign([role_name], actor_perms)
+    UserRole.objects.get_or_create(user_id=user_id, role=role)
+    _announce_user(actor_id, "user.role_added", user_id)
+
+
+def remove_user_role(user_id, role_name, *, actor_id=None) -> None:
+    """Remove one role from a user (last-owner guarded)."""
+    role = Role.objects.filter(name=role_name).first()
+    if role is None:
+        raise RoleError(f"unknown role {role_name!r}")
+    current = set(UserRole.objects.filter(user_id=user_id).values_list("role__name", flat=True))
+    if _owner_lost(user_id, current - {role_name}):
+        raise DomainError("cannot remove the last owner", 409)
+    UserRole.objects.filter(user_id=user_id, role=role).delete()
+    _announce_user(actor_id, "user.role_removed", user_id)

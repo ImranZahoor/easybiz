@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from django.db import transaction
 from ninja import Router
 from ninja.errors import HttpError
@@ -17,6 +19,7 @@ from easybiz.core.api.types import (
     TenantSummary,
     UserIn,
     UserOut,
+    UserRolesIn,
 )
 from easybiz.core.audit import service as audit
 from easybiz.core.audit.models import AuditLog
@@ -27,7 +30,7 @@ from easybiz.core.iam.models import Role, UserRole
 from easybiz.core.kernel import lifecycle, state
 from easybiz.core.kernel.registry import registry
 from easybiz.core.users import service as users
-from easybiz.core.users.models import Membership
+from easybiz.core.users.models import Membership, User
 
 router = Router()
 
@@ -186,7 +189,12 @@ def create_user(request, data: UserIn):
             user = users.create_user(
                 data.email, request.tenant, password=data.password, name=data.name
             )
-            iam.set_user_roles(user.id, data.roles)
+            iam.set_user_roles(
+                user.id,
+                data.roles,
+                actor_id=request.auth.id,
+                actor_perms=iam.permissions_for(request.auth.id),
+            )
     except (users.WeakPassword, iam.RoleError) as exc:
         raise HttpError(422, str(exc)) from exc
     audit.record(request.auth.id, "user.added", entity="user", entity_id=str(user.id))
@@ -205,6 +213,41 @@ def delete_user(request, user_id: str):
     events.publish("core.membership.removed", {"user_id": user_id})
     audit.record(request.auth.id, "user.removed", entity="user", entity_id=user_id)
     return Status(204, None)
+
+
+def _user_out(user_id: UUID) -> UserOut:
+    user = User.objects.filter(id=user_id).first()
+    if user is None:
+        raise HttpError(404, "user not found")
+    return _user_view(user)
+
+
+@router.put("/users/{user_id}/roles", auth=perm("core.user.manage"), response=UserOut)
+def set_user_roles(request, user_id: UUID, data: UserRolesIn):
+    """Replace a user's role set."""
+    iam.set_user_roles(
+        user_id,
+        data.roles,
+        actor_id=request.auth.id,
+        actor_perms=iam.permissions_for(request.auth.id),
+    )
+    return _user_out(user_id)
+
+
+@router.post("/users/{user_id}/roles/{name}", auth=perm("core.user.manage"), response=UserOut)
+def add_user_role(request, user_id: UUID, name: str):
+    """Grant one role to a user."""
+    iam.add_user_role(
+        user_id, name, actor_id=request.auth.id, actor_perms=iam.permissions_for(request.auth.id)
+    )
+    return _user_out(user_id)
+
+
+@router.delete("/users/{user_id}/roles/{name}", auth=perm("core.user.manage"), response=UserOut)
+def remove_user_role(request, user_id: UUID, name: str):
+    """Remove one role from a user."""
+    iam.remove_user_role(user_id, name, actor_id=request.auth.id)
+    return _user_out(user_id)
 
 
 @router.get("/audit", auth=perm("core.audit.read"), response=list[AuditOut])
