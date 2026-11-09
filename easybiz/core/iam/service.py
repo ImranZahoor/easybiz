@@ -89,6 +89,20 @@ def role_permissions(role) -> list[str]:
     return sorted(role.permissions.values_list("permission", flat=True))
 
 
+def permission_groups(tenant) -> list[dict]:
+    """Assignable permissions grouped by module ("core" for core permissions)."""
+    enabled = state.enabled_module_ids(tenant)
+    rows = Permission.objects.filter(Q(module__isnull=True) | Q(module_id__in=enabled)).order_by(
+        "code"
+    )
+    groups: dict[str, list[dict]] = {}
+    for p in rows:
+        groups.setdefault(p.module_id or "core", []).append(
+            {"code": p.code, "description": p.description}
+        )
+    return [{"module": m, "permissions": perms} for m, perms in sorted(groups.items())]
+
+
 def _get_role(role_id) -> Role:
     role = Role.objects.filter(id=role_id).first()
     if role is None:

@@ -12,7 +12,9 @@ from easybiz.core.api.types import (
     AuditOut,
     ContextOut,
     ModuleOut,
+    PermissionGroupOut,
     RoleCloneIn,
+    RoleDetailOut,
     RoleIn,
     RoleOut,
     RoleUpdateIn,
@@ -120,6 +122,29 @@ def _role_view(role) -> RoleOut:
 @router.get("/roles", auth=perm("core.role.read"), response=list[RoleOut])
 def list_roles(request):
     return [_role_view(r) for r in Role.objects.order_by("name")]
+
+
+@router.get("/permissions", auth=perm("core.role.read"), response=list[PermissionGroupOut])
+def list_permissions(request):
+    """Assignable permissions for this tenant, grouped by module."""
+    return iam.permission_groups(request.tenant)
+
+
+@router.get("/roles/{role_id}", auth=perm("core.role.read"), response=RoleDetailOut)
+def get_role(request, role_id: UUID):
+    """One role with its parent and effective (own + inherited) permissions."""
+    role = Role.objects.filter(id=role_id).first()
+    if role is None:
+        raise HttpError(404, "role not found")
+    return RoleDetailOut(
+        id=str(role.id),
+        name=role.name,
+        description=role.description,
+        is_system=role.is_system,
+        parent=role.parent.name if role.parent else None,
+        permissions=iam.role_permissions(role),
+        effective_permissions=sorted(iam.effective_codes(role)),
+    )
 
 
 @router.post("/roles", auth=perm("core.role.manage"), response={201: RoleOut})
