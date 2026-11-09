@@ -10,8 +10,10 @@ from easybiz.core.api.types import (
     AuditOut,
     ContextOut,
     ModuleOut,
+    RoleCloneIn,
     RoleIn,
     RoleOut,
+    RoleUpdateIn,
     TenantSummary,
     UserIn,
     UserOut,
@@ -119,11 +121,47 @@ def list_roles(request):
 
 @router.post("/roles", auth=perm("core.role.manage"), response={201: RoleOut})
 def create_role(request, data: RoleIn):
-    try:
-        role = iam.create_role(request.tenant, data.name, data.permissions, data.description)
-    except iam.RoleError as exc:
-        raise HttpError(422, str(exc)) from exc
+    role = iam.create_role(
+        request.tenant,
+        data.name,
+        data.permissions,
+        data.description,
+        actor_perms=iam.permissions_for(request.auth.id),
+    )
     audit.record(request.auth.id, "role.created", entity="role", entity_id=str(role.id))
+    return Status(201, _role_view(role))
+
+
+@router.patch("/roles/{role_id}", auth=perm("core.role.manage"), response=RoleOut)
+def update_role(request, role_id: str, data: RoleUpdateIn):
+    """Change name/description/permissions/parent (system roles: description only)."""
+    role = iam.update_role(
+        request.tenant,
+        role_id,
+        actor_id=request.auth.id,
+        actor_perms=iam.permissions_for(request.auth.id),
+        changes=data.model_dump(exclude_unset=True),
+    )
+    return _role_view(role)
+
+
+@router.delete("/roles/{role_id}", auth=perm("core.role.manage"), response={204: None})
+def delete_role(request, role_id: str, force: bool = False):
+    """Delete a non-system role; needs ?force=true if still assigned."""
+    iam.delete_role(role_id, force=force, actor_id=request.auth.id)
+    return Status(204, None)
+
+
+@router.post("/roles/{role_id}/clone", auth=perm("core.role.manage"), response={201: RoleOut})
+def clone_role(request, role_id: str, data: RoleCloneIn):
+    """Duplicate a role's permissions and parent under a new name."""
+    role = iam.clone_role(
+        request.tenant,
+        role_id,
+        data.name,
+        actor_id=request.auth.id,
+        actor_perms=iam.permissions_for(request.auth.id),
+    )
     return Status(201, _role_view(role))
 
 

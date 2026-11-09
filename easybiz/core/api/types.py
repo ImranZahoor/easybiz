@@ -59,6 +59,17 @@ class RoleOut(Schema):
     permissions: list[str]
 
 
+class RoleUpdateIn(Schema):
+    name: str | None = None
+    description: str | None = None
+    permissions: list[str] | None = None
+    parent: str | None = None
+
+
+class RoleCloneIn(Schema):
+    name: str
+
+
 class UserIn(Schema):
     email: str
     password: str | None = None
