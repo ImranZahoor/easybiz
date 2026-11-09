@@ -6,6 +6,7 @@ from easybiz.core.audit import service as audit
 from easybiz.core.catalog.models import Permission
 from easybiz.core.errors import DomainError
 from easybiz.core.events import service as events
+from easybiz.core.iam import cache
 from easybiz.core.iam.models import Role, RolePermission, UserRole
 from easybiz.core.kernel import state
 from easybiz.core.kernel.registry import registry
@@ -141,6 +142,7 @@ def _snapshot(role: Role) -> dict:
 def _announce(actor_id, action: str, role_name: str, before, after) -> None:
     audit.record(actor_id, action, entity="role", entity_id=role_name, before=before, after=after)
     events.publish("core.role.changed", {"role": role_name}, producer="core")
+    cache.bump_role_version()
 
 
 def _resolve_parent(name):
@@ -162,6 +164,7 @@ def create_role(tenant, name: str, permissions, description: str = "", actor_per
     role = Role.objects.create(name=name, description=description, is_system=False)
     RolePermission.objects.bulk_create([RolePermission(role=role, permission=p) for p in perms])
     events.publish("core.role.changed", {"role": name}, producer="core")
+    cache.bump_role_version()
     return role
 
 
@@ -252,6 +255,7 @@ def _owner_lost(user_id, new_role_names) -> bool:
 def _announce_user(actor_id, action: str, user_id) -> None:
     audit.record(actor_id, action, entity="user", entity_id=str(user_id))
     events.publish("core.role.changed", {"user": str(user_id)}, producer="core")
+    cache.bump_role_version()
 
 
 def set_user_roles(user_id, role_names, *, actor_id=None, actor_perms=None) -> None:
