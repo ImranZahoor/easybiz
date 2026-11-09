@@ -3,21 +3,55 @@ from __future__ import annotations
 from django.db.models import Q
 
 from easybiz.core.catalog.models import Permission
+from easybiz.core.errors import DomainError
 from easybiz.core.iam.models import Role, RolePermission, UserRole
 from easybiz.core.kernel import state
 from easybiz.core.kernel.registry import registry
 
 
-class RoleError(Exception):
+class RoleError(DomainError):
     """Invalid role definition or assignment (maps to HTTP 422)."""
 
+    def __init__(self, message: str) -> None:
+        super().__init__(message, 422)
 
-def permissions_for(user_id) -> set[str]:
-    """Union of the permission codes of the user's roles in the current schema."""
-    role_ids = UserRole.objects.filter(user_id=user_id).values_list("role_id", flat=True)
+
+def _ancestors(role: Role) -> list[Role]:
+    """A role's parent chain (cycle-safe: stops if a role repeats)."""
+    chain: list[Role] = []
+    seen = {role.id}
+    current = role.parent
+    while current is not None and current.id not in seen:
+        chain.append(current)
+        seen.add(current.id)
+        current = current.parent
+    return chain
+
+
+def effective_codes(role: Role) -> set[str]:
+    """A role's own permission codes unioned with all its ancestors'."""
+    role_ids = [role.id, *(a.id for a in _ancestors(role))]
     return set(
         RolePermission.objects.filter(role_id__in=role_ids).values_list("permission", flat=True)
     )
+
+
+def would_cycle(role: Role, new_parent: Role | None) -> bool:
+    """True if making ``new_parent`` the parent of ``role`` would form a cycle."""
+    if new_parent is None:
+        return False
+    if new_parent.id == role.id:
+        return True
+    return role.id in {a.id for a in _ancestors(new_parent)}
+
+
+def permissions_for(user_id) -> set[str]:
+    """Union of the effective (own + inherited) permission codes of the user's roles."""
+    roles = Role.objects.filter(assignments__user_id=user_id).select_related("parent").distinct()
+    perms: set[str] = set()
+    for role in roles:
+        perms |= effective_codes(role)
+    return perms
 
 
 def has_permission(perms: set[str], code: str) -> bool:
