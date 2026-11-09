@@ -793,8 +793,9 @@ Feature ids are stable (`F1` to `F22`). "Depends" lists features that must exist
 | F19 | Observability and operations | P3 | | 22 |
 | F20 | Security and compliance | P3 | F13 | 22 |
 | F22 | Performance and scale | P3 | F15 | 22 |
+| F23 | Agent tooling (MCP server + integrated chatbot over a shared tool registry) | P2 | F14 (soft F13, F21, F17) | 23 |
 
-**Suggested order:** F14, F17, F1, F2 (prove modularity), then F7, F5, F15, F11, F3, F4, F6, F8, F9, F10, F12, F13, F21, then F16, F19, F20, F22, with F18 started once F21 and F14 are done.
+**Suggested order:** F14, F17, F1, F2 (prove modularity), then F7, F5, F15, F11, F3, F4, F6, F8, F9, F10, F12, F13, F21, then F16, F19, F20, F22, with F18 started once F21 and F14 are done. **F23** is planned after F14 (its tool registry reuses the `commands.py`/`queries.py` layer); a read-only slice can ship earlier, and the secure write/agent-key path composes F13 + F21 + F17.
 
 ### 13.2 Feature template
 
@@ -1305,6 +1306,36 @@ class EmployeeProvider(Protocol):
 - [ ] A documented rule states at what schema count and migration duration a new shard is added.
 
 ---
+
+### F23. Agent tooling (MCP server + integrated chatbot over a shared tool registry)
+
+**Purpose:** expose the system's operations as **tools** for AI agents — reachable by external agents over **MCP** and by an **integrated platform chatbot** — from a *single* registry, designed for maximum coverage, security by architecture, and low agent token/cost.
+
+**Depends on:** F14 (fine-grained/ABAC scoping of tools), soft on F13 (agent API keys), F21 (paginated/field-limited/idempotent responses), F17 (per-module tool declarations verified by the contract kit). Builds directly on the Part A `commands.py`/`queries.py` layer.
+
+**Core principle — one tool layer, many transports.** A Tool is a transport-agnostic wrapper over an existing `commands`/`queries` function; the HTTP API, the MCP server, and the chatbot are all transports over the same domain layer. No tool re-implements business logic.
+
+**Design**
+
+1. **Tool registry (`easybiz/core/tools/`).** A `Tool` carries: `name`, concise `description`, **input schema** (reuse the operation's `…Params` ninja/pydantic Schema), **output schema** (reuse `…Out`), the **same `perm()` code** the matching HTTP endpoint uses, a **risk tier** derived from command-vs-query (`read | write | admin`), and `idempotent` flag. Core registers core tools; a module contributes tools via manifest v2 `tools` / a `tools.py` (mostly auto-derived from its command/query signatures), verified by the F17 contract kit (every tool's permission must be declared; schemas must validate). "Maximum tooling" = auto-expose the command/query layer; keep tools coarse and task-oriented, not raw CRUD.
+2. **Transports.** MCP server (`easybiz/core/mcp/`, stdio + streamable-HTTP) for external agents; in-process adapter for the integrated chatbot. Both enumerate the *same* registry.
+3. **Security by architecture.**
+   - **Identity & scope:** external agents authenticate with a **scoped agent API key** (F13) bound to *tenant + on-behalf-of user + a permission subset + an explicit tool allowlist + a `read`/`write` scope*; never a full user token. Least privilege by default (deny-all, allowlist). The chatbot runs in-process with the signed-in user's own permissions — no escalation. Platform-scope tools require a platform token.
+   - **Authorization:** every invocation is gated by the tool's `perm()` against the caller's effective permissions — the exact iam gate the HTTP layer uses. Nothing bypasses it.
+   - **Tenant isolation:** schema-per-tenant; a tenant-A agent can never reach tenant B.
+   - **Write safety:** `read` tools are freely exposable; `write` tools need the write scope; `admin`/irreversible tools (delete-tenant, remove-data) are excluded from agents by default or require elevation + human confirmation. The command/query split makes the tier mechanical.
+   - **Validated inputs, full audit:** inputs are pydantic-validated structured data (no free-form code/SQL), so prompt-injection cannot exceed the scoped permissions; every call is audited (`actor = agent key on behalf of user`).
+4. **Low token/cost for models.**
+   - **Tiered/lazy discovery:** a tiny always-on meta-toolset (`search_tools`, `describe_tool`) + load-on-demand schemas, so an agent holds only the few schemas it needs — "max tooling" without a huge context.
+   - Compact descriptions; **enum-constrained inputs** (`StrEnum`s) so the model doesn't guess; paginated, field-limited, pre-summarised responses (F21) to bound output tokens; server-side **composite tools** to cut round-trips; idempotency keys so retries are free.
+   - Because tools are scoped + validated, a **cheaper model is safe** to drive them — safety is in the architecture, not the model.
+5. **Slices.** (a) read-only MCP over `queries` (safe, cheap — can start early); (b) scoped agent keys + write tools (with F13); (c) integrated chatbot; (d) per-module tool contributions + contract tests (with F17); (e) composite/task tools + response shaping (with F21).
+
+**Acceptance (high level)**
+- [ ] One registry; a tool is defined once and reachable identically via MCP and the chatbot.
+- [ ] Every tool invocation enforces the same permission as its HTTP endpoint; an agent cannot exceed its key's scope/allowlist; cross-tenant access is impossible.
+- [ ] `read`/`write`/`admin` tiers honoured; admin/irreversible tools are not agent-exposable without elevation; every call is audited.
+- [ ] Lazy discovery keeps an agent's tool-schema context small; responses are paginated/field-limited; a small model completes common tasks within scope.
 
 ## Appendix A. Manifest example (the real Timesheets manifest, version 1 format)
 
