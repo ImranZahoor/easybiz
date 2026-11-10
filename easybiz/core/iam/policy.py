@@ -51,6 +51,9 @@ def _validate(node: object, *, depth: int) -> int:
             raise PolicyError(f"'{op}' needs 'left' and 'right' operands")
         _validate_operand(node["left"])
         _validate_operand(node["right"])
+        right = node["right"]
+        if op == "in" and not _is_var(right) and not isinstance(right, (list, str)):
+            raise PolicyError("'in' needs a list, string, or var on the right")
         return 1
     raise PolicyError(f"unknown operator {op!r}")
 
@@ -91,9 +94,32 @@ def _resolve(operand: object, env: dict):
     return operand
 
 
+def _as_number(value: object) -> float | None:
+    """Coerce an int/float or a numeric string to a float; None if not numeric (bools excluded)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
+_ORDERING = {"lt", "lte", "gt", "gte"}
+
+
 def _compare(op: str, left: object, right: object) -> bool:
     if left is MISSING or right is MISSING:
         return False
+    if op in _ORDERING:
+        # a number stored as a string (e.g. approval_limit "8") still compares numerically,
+        # so a deny rule does not silently fail open; genuinely incomparable stays False below
+        left_num, right_num = _as_number(left), _as_number(right)
+        if left_num is not None and right_num is not None:
+            left, right = left_num, right_num
     try:
         if op == "eq":
             return left == right

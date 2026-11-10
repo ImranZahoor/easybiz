@@ -136,3 +136,32 @@ def test_validate_accepts_valid_tree():
             ],
         }
     )
+
+
+def test_validate_rejects_in_non_collection():
+    # a literal right operand for `in` must be a collection (list/str), not a scalar
+    with pytest.raises(PolicyError):
+        policy.validate_condition({"op": "in", "left": {"var": "resource.x"}, "right": 5})
+
+
+def test_validate_accepts_in_with_var_or_list_right():
+    policy.validate_condition({"op": "in", "left": {"var": "resource.x"}, "right": ["a", "b"]})
+    policy.validate_condition(
+        {"op": "in", "left": {"var": "resource.x"}, "right": {"var": "subject.allowed"}}
+    )
+
+
+def test_numeric_string_operand_coerces_for_ordering():
+    # a deny rule must still fire when approval_limit is stored as the string "8"
+    env = {"subject": {"approval_limit": "8"}, "resource": {"hours": 10}, "context": {}}
+    assert (
+        policy.evaluate_condition(
+            {
+                "op": "gt",
+                "left": {"var": "resource.hours"},
+                "right": {"var": "subject.approval_limit"},
+            },
+            env,
+        )
+        is True
+    )
