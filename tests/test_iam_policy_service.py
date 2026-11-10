@@ -1,17 +1,18 @@
 import pytest
 from django_tenants.utils import tenant_context
 
+from easybiz.core.audit.models import AuditLog
 from easybiz.core.iam import service as iam
 from easybiz.core.iam.enums import PolicyEffect
+from easybiz.core.iam.models import Role, RolePermission, UserAttribute, UserRole
 from easybiz.core.iam.policy import PolicyError
+from easybiz.core.kernel import lifecycle
 
 PERM = "timesheets.entry.approve"
 GT = {"op": "gt", "left": {"var": "resource.hours"}, "right": {"var": "subject.approval_limit"}}
 
 
 def _enable_timesheets(tenant):
-    from easybiz.core.kernel import lifecycle
-
     lifecycle.enable_module(tenant, "timesheets", actor_id=None)
 
 
@@ -101,8 +102,6 @@ def test_priority_orders_decider(synced, db_tenant):
 def test_policy_change_invalidates_authorize(synced, db_tenant):
     with tenant_context(db_tenant):
         _enable_timesheets(db_tenant)
-        from easybiz.core.iam.models import Role, RolePermission, UserAttribute, UserRole
-
         role = Role.objects.create(name="r")
         RolePermission.objects.create(role=role, permission=PERM)
         uid = "33333333-3333-3333-3333-333333333333"
@@ -131,8 +130,6 @@ def test_user_attribute_crud(synced, db_tenant):
 def test_create_policy_writes_audit(synced, db_tenant):
     with tenant_context(db_tenant):
         _enable_timesheets(db_tenant)
-        from easybiz.core.audit.models import AuditLog
-
         iam.create_policy(
             db_tenant, permission=PERM, effect=PolicyEffect.DENY_IF, condition=GT, actor_id=None
         )

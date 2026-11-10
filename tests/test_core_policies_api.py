@@ -1,9 +1,11 @@
+from django.db import connection
 from django.test import Client
 from django_tenants.utils import tenant_context
 
 from easybiz.core.api.security import encode_tenant_token
 from easybiz.core.iam import service as iam
 from easybiz.core.iam.models import UserRole
+from easybiz.core.tenancy.models import Tenant
 from easybiz.core.users import service as users
 
 GT = {"op": "gt", "left": {"var": "resource.hours"}, "right": {"var": "subject.approval_limit"}}
@@ -40,8 +42,6 @@ def _limited_token(tenant, perms):
 
 
 def test_requires_policy_manage(synced, provision):
-    from easybiz.core.tenancy.models import Tenant
-
     _owner(provision, "pol1")
     tenant = Tenant.objects.get(slug="pol1")
     tok = _limited_token(tenant, ["core.user.read"])
@@ -104,8 +104,6 @@ def test_user_attributes_put_get(synced, provision):
 
 
 def test_policies_are_tenant_isolated(synced, provision):
-    from django.db import connection
-
     a = _owner(provision, "pola")
     _req(
         "post",

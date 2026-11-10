@@ -8,6 +8,7 @@ from django_tenants.utils import tenant_context
 from easybiz.core.iam import service as iam
 from easybiz.core.iam.enums import PolicyEffect
 from easybiz.core.iam.models import Role, RolePermission, UserAttribute, UserRole
+from easybiz.core.kernel import lifecycle
 from easybiz.modules.timesheets import commands
 from easybiz.modules.timesheets.enums import EntryStatus
 from easybiz.modules.timesheets.models import Entry, Project
@@ -20,8 +21,6 @@ REVIEWER = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
 
 def _enable(tenant):
-    from easybiz.core.kernel import lifecycle
-
     lifecycle.enable_module(tenant, "timesheets", actor_id=None)
 
 
