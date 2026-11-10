@@ -131,6 +131,110 @@ def authorize(user_id, permission: str, resource: dict | None = None, context: d
     return allowed
 
 
+def user_attributes(user_id) -> dict:
+    """Admin read of a user's attribute map (same data as ``subject_attrs``)."""
+    return subject_attrs(user_id)
+
+
+def _assert_policy_permission(tenant, permission: str) -> None:
+    """A policy's permission must be a real tenant permission or an enabled ``module.*`` group."""
+    if permission.endswith(".*"):
+        prefix = permission[:-2]
+        if prefix != "core" and prefix not in state.enabled_module_ids(tenant):
+            raise policy.PolicyError(f"unknown or disabled module group {permission!r}")
+    elif permission not in assignable_permissions(tenant):
+        raise policy.PolicyError(f"unknown or disabled permission {permission!r}")
+
+
+def _coerce_effect(effect) -> PolicyEffect:
+    try:
+        return PolicyEffect(effect)
+    except ValueError as exc:
+        raise policy.PolicyError(f"unknown effect {effect!r}") from exc
+
+
+def get_policy(policy_id) -> Policy:
+    pol = Policy.objects.filter(id=policy_id).first()
+    if pol is None:
+        raise DomainError("policy not found", 404)
+    return pol
+
+
+def list_policies() -> list[Policy]:
+    return list(Policy.objects.order_by("-priority", "permission"))
+
+
+def create_policy(
+    tenant, *, permission, effect, condition, priority=0, description="", actor_id
+) -> Policy:
+    """Create an ABAC policy after validating its permission, effect, and condition tree."""
+    _assert_policy_permission(tenant, permission)
+    effect = _coerce_effect(effect)
+    policy.validate_condition(condition)
+    pol = Policy.objects.create(
+        permission=permission,
+        effect=effect,
+        condition=condition,
+        priority=priority,
+        description=description,
+    )
+    audit.record(actor_id, "policy.created", entity="policy", entity_id=str(pol.id))
+    cache.bump_role_version()
+    return pol
+
+
+def update_policy(tenant, policy_id, *, actor_id, changes: dict) -> Policy:
+    """Apply only the provided fields (permission/effect/condition/priority/description/is_active)."""
+    pol = get_policy(policy_id)
+    if "permission" in changes:
+        _assert_policy_permission(tenant, changes["permission"])
+        pol.permission = changes["permission"]
+    if "effect" in changes:
+        pol.effect = _coerce_effect(changes["effect"])
+    if "condition" in changes:
+        policy.validate_condition(changes["condition"])
+        pol.condition = changes["condition"]
+    if "priority" in changes:
+        pol.priority = changes["priority"]
+    if "description" in changes:
+        pol.description = changes["description"]
+    if "is_active" in changes:
+        pol.is_active = changes["is_active"]
+    pol.save()
+    audit.record(actor_id, "policy.updated", entity="policy", entity_id=str(pol.id))
+    cache.bump_role_version()
+    return pol
+
+
+def delete_policy(policy_id, *, actor_id) -> None:
+    pol = get_policy(policy_id)
+    pol.delete()
+    audit.record(actor_id, "policy.deleted", entity="policy", entity_id=str(policy_id))
+    cache.bump_role_version()
+
+
+def evaluate_policy(tenant, *, permission, subject: dict, resource: dict, context: dict) -> dict:
+    """ABAC-only dry run over a supplied subject/resource/context (ignores RBAC)."""
+    env = {"subject": subject, "resource": resource, "context": context}
+    allowed, decided_by, reason = _abac_decision(active_policy_dicts(), permission, env)
+    return {"allowed": allowed, "decided_by": decided_by, "reason": reason}
+
+
+def set_user_attribute(user_id, key, value, *, actor_id) -> None:
+    """Upsert a single subject attribute for a user."""
+    UserAttribute.objects.update_or_create(user_id=user_id, key=key, defaults={"value": value})
+    audit.record(actor_id, "user.attribute_set", entity="user_attribute", entity_id=f"{user_id}:{key}")
+    cache.bump_role_version()
+
+
+def remove_user_attribute(user_id, key, *, actor_id) -> None:
+    UserAttribute.objects.filter(user_id=user_id, key=key).delete()
+    audit.record(
+        actor_id, "user.attribute_removed", entity="user_attribute", entity_id=f"{user_id}:{key}"
+    )
+    cache.bump_role_version()
+
+
 def menu_for(tenant, perms: set[str]) -> list[dict]:
     """Menu items from enabled modules' manifests, filtered by each item's permission."""
     items: list[dict] = []
