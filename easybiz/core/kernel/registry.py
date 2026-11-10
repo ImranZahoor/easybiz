@@ -8,6 +8,7 @@ from pathlib import Path
 from django.apps import apps
 from django.conf import settings
 
+from easybiz.core import contracts
 from easybiz.core.kernel.manifest import Manifest, Version, VersionRange, parse_manifest
 
 
@@ -42,7 +43,59 @@ class Registry:
     def load_order(self) -> list[str]:
         """Validate every requirement, then return ids in dependency-first order."""
         self._assert_requirements()
+        self._assert_requires_core()
+        self._assert_contracts_exist()
+        self._assert_consumes_satisfiable()
         return self._topological_order()
+
+    def _assert_requires_core(self) -> None:
+        """A module's `requires_core` range must contain the running core version."""
+        core = Version.parse(settings.EASYBIZ_CORE_VERSION)
+        for m in self._manifests.values():
+            if m.requires_core is not None and not VersionRange.parse(m.requires_core).contains(core):
+                raise RegistryError(
+                    f"module {m.id!r} requires_core {m.requires_core}, core is {settings.EASYBIZ_CORE_VERSION}"
+                )
+
+    def _assert_contracts_exist(self) -> None:
+        """Every provides/consumes contract must be a name defined in easybiz.core.contracts."""
+        for m in self._manifests.values():
+            names = [c for c, _ in m.provides] + [c for c, _, _ in m.consumes]
+            for name in names:
+                if not hasattr(contracts, name):
+                    raise RegistryError(f"module {m.id!r} names unknown contract {name!r}")
+
+    def _assert_consumes_satisfiable(self) -> None:
+        """A non-optional consume must be provided by one of the module's `requires` targets."""
+        for m in self._manifests.values():
+            req_ids = {dep for dep, _ in m.requires}
+            for contract, _, optional in m.consumes:
+                if optional:
+                    continue
+                providers = {
+                    dep
+                    for dep in req_ids
+                    if (t := self._manifests.get(dep)) and contract in [c for c, _ in t.provides]
+                }
+                if not providers:
+                    raise RegistryError(
+                        f"module {m.id!r} consumes {contract!r} but no required module provides it "
+                        f"(mark it optional if that is intended)"
+                    )
+
+    def _assert_provides_registered(self) -> None:
+        """Each declared `provides (contract, version)` must be registered by that module."""
+        from easybiz.core.kernel import capabilities
+
+        for m in self._manifests.values():
+            for name, version in m.provides:
+                contract = getattr(contracts, name, None)
+                meta = capabilities.provider_meta(contract) if contract is not None else None
+                if meta != (m.id, version):
+                    raise RegistryError(
+                        f"module {m.id!r} declares provides {name!r} {version} "
+                        f"but the registered provider is {meta!r}"
+                    )
 
     def _assert_requirements(self) -> None:
         """Each `requires` target must be installed and satisfy its version range."""
@@ -161,6 +214,7 @@ class Registry:
             self._import_optional(f"{manifest.package}.handlers")
             self._import_optional(f"{manifest.package}.providers")
         self._assert_subscriptions_satisfied()
+        self._assert_provides_registered()
 
     @staticmethod
     def _import_optional(dotted_name: str) -> None:
