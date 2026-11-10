@@ -6,8 +6,9 @@ from easybiz.core.audit import service as audit
 from easybiz.core.catalog.models import Permission
 from easybiz.core.errors import DomainError
 from easybiz.core.events import service as events
-from easybiz.core.iam import cache
-from easybiz.core.iam.models import Role, RolePermission, UserRole
+from easybiz.core.iam import cache, policy
+from easybiz.core.iam.enums import PolicyEffect
+from easybiz.core.iam.models import Policy, Role, RolePermission, UserAttribute, UserRole
 from easybiz.core.kernel import state
 from easybiz.core.kernel.registry import registry
 
@@ -62,6 +63,72 @@ def has_permission(perms: set[str], code: str) -> bool:
     if "*" in perms or code in perms:
         return True
     return f"{code.split('.')[0]}.*" in perms
+
+
+# --- ABAC (F14b): policies layered after the RBAC gate -----------------------
+
+
+def subject_attrs(user_id) -> dict:
+    """The user's attribute map (e.g. ``{"approval_limit": 8}``) for policy subjects."""
+    return dict(UserAttribute.objects.filter(user_id=user_id).values_list("key", "value"))
+
+
+def active_policy_dicts() -> list[dict]:
+    """Active policies as plain dicts (cacheable), highest priority first."""
+    return [
+        {
+            "id": str(p.id),
+            "permission": p.permission,
+            "effect": p.effect,
+            "condition": p.condition,
+            "priority": p.priority,
+        }
+        for p in Policy.objects.filter(is_active=True).order_by("-priority")
+    ]
+
+
+def _policy_matches_permission(policy_permission: str, permission: str) -> bool:
+    """A policy applies to ``permission`` by exact match or a ``<prefix>.*`` group."""
+    if policy_permission == permission:
+        return True
+    if policy_permission.endswith(".*"):
+        return permission == policy_permission[:-2] or permission.startswith(policy_permission[:-1])
+    return False
+
+
+def _abac_decision(policy_dicts, permission: str, env: dict) -> tuple[bool, str | None, str]:
+    """Deny-overrides, allow-required-if-any, over already-fetched policy dicts."""
+    matching = [p for p in policy_dicts if _policy_matches_permission(p["permission"], permission)]
+    denies = sorted(
+        (p for p in matching if p["effect"] == PolicyEffect.DENY_IF),
+        key=lambda d: -d["priority"],
+    )
+    allows = sorted(
+        (p for p in matching if p["effect"] == PolicyEffect.ALLOW_IF),
+        key=lambda a: -a["priority"],
+    )
+    for p in denies:
+        if policy.evaluate_condition(p["condition"], env):
+            return False, p["id"], "denied by deny_if policy"
+    if allows:
+        for p in allows:
+            if policy.evaluate_condition(p["condition"], env):
+                return True, p["id"], "allowed by allow_if policy"
+        return False, None, "no allow_if matched"
+    return True, None, "no policy applies"
+
+
+def authorize(user_id, permission: str, resource: dict | None = None, context: dict | None = None) -> bool:
+    """RBAC must grant first; then ABAC policies decide (deny-overrides, allow-required)."""
+    if not has_permission(cache.cached_permissions_for(user_id), permission):
+        return False
+    env = {
+        "subject": cache.cached_subject_attrs(user_id),
+        "resource": resource or {},
+        "context": context or {},
+    }
+    allowed, _, _ = _abac_decision(cache.cached_active_policies(), permission, env)
+    return allowed
 
 
 def menu_for(tenant, perms: set[str]) -> list[dict]:
