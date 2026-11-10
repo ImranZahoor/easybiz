@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TypeGuard
+
 from easybiz.core.errors import DomainError
 
 # A policy condition is a declarative tree, never executable code:
@@ -60,7 +62,7 @@ def _validate_operand(operand: object) -> None:
             raise PolicyError(f"var path must start with one of {sorted(ROOTS)}: {path!r}")
 
 
-def _is_var(operand: object) -> bool:
+def _is_var(operand: object) -> TypeGuard[dict]:
     return isinstance(operand, dict) and set(operand) == {"var"}
 
 

@@ -6,6 +6,19 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F14b (authorization v2 — ABAC) — complete.** Attribute-based policies layer on top of
+F14a's RBAC: tenant tables `iam_policy` (`allow_if`/`deny_if` rules with a declarative
+condition tree — operators `eq/ne/lt/lte/gt/gte/in/and/or/not` over `subject.*`/`resource.*`/
+`context.*`, **never** evaluated as code, depth/node-count capped) and `iam_userattribute`
+(subject attributes like `approval_limit`). `authorize(user, perm, resource, context)` runs
+**after** the `perm()` RBAC gate (RBAC must grant first → any matching `deny_if` denies → if
+any `allow_if` exists at least one must match), reading policies/attributes through the F14a
+version-keyed cache (policy/attribute changes bump it). `/api/core/policies` (CRUD +
+`POST /policies/evaluate` dry-run) and `/api/core/users/{id}/attributes` sit under a new
+`core.policy.manage`; invalid conditions are rejected on save (422). Demonstrated by gating
+timesheet approval on the approver's `approval_limit` vs the entry's hours. Org-scope row
+filtering remains **F3**.
+
 **F14a (authorization v2 — roles) — complete.** Part B begins here: full role
 administration — `GET`/`PATCH`/`DELETE`/`clone` roles, `PUT`/`POST`/`DELETE` user-role
 assignment, `GET /core/permissions` (grouped by module), `GET /core/roles/{id}` (parent +

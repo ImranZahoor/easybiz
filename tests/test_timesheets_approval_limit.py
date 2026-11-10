@@ -49,7 +49,9 @@ def test_approve_over_limit_is_403(synced, db_tenant):
     with tenant_context(db_tenant):
         _enable(db_tenant)
         _reviewer(limit=8)
-        iam.create_policy(db_tenant, permission=PERM, effect=PolicyEffect.DENY_IF, condition=GT, actor_id=None)
+        iam.create_policy(
+            db_tenant, permission=PERM, effect=PolicyEffect.DENY_IF, condition=GT, actor_id=None
+        )
         entry = _submitted_entry(10)
         with pytest.raises(commands.TimesheetError) as exc:
             commands.approve_entry(ReviewEntryParams(reviewer_id=REVIEWER, entry_id=entry.id))
@@ -60,7 +62,9 @@ def test_approve_within_limit_succeeds(synced, db_tenant):
     with tenant_context(db_tenant):
         _enable(db_tenant)
         _reviewer(limit=8)
-        iam.create_policy(db_tenant, permission=PERM, effect=PolicyEffect.DENY_IF, condition=GT, actor_id=None)
+        iam.create_policy(
+            db_tenant, permission=PERM, effect=PolicyEffect.DENY_IF, condition=GT, actor_id=None
+        )
         entry = _submitted_entry(6)
         out = commands.approve_entry(ReviewEntryParams(reviewer_id=REVIEWER, entry_id=entry.id))
         assert out.status == EntryStatus.APPROVED
@@ -70,7 +74,9 @@ def test_reviewer_without_limit_unaffected(synced, db_tenant):
     with tenant_context(db_tenant):
         _enable(db_tenant)
         _reviewer(limit=None)  # no approval_limit attribute
-        iam.create_policy(db_tenant, permission=PERM, effect=PolicyEffect.DENY_IF, condition=GT, actor_id=None)
+        iam.create_policy(
+            db_tenant, permission=PERM, effect=PolicyEffect.DENY_IF, condition=GT, actor_id=None
+        )
         entry = _submitted_entry(10)
         out = commands.approve_entry(ReviewEntryParams(reviewer_id=REVIEWER, entry_id=entry.id))
         assert out.status == EntryStatus.APPROVED
@@ -105,20 +111,48 @@ def test_http_smoke_approval_limit(synced, provision):
     provision(slug=slug, modules=("timesheets",))
     owner = _login(slug, f"owner@{slug}.test")
 
-    _req("post", "/api/core/users", owner, slug,
-         {"email": f"appr@{slug}.test", "password": "change-me-now", "roles": ["timesheet_approver"]})
-    appr_id = next(u["id"] for u in _req("get", "/api/core/users", owner, slug).json()
-                   if u["email"] == f"appr@{slug}.test")
-    _req("put", f"/api/core/users/{appr_id}/attributes", owner, slug, {"attributes": {"approval_limit": 8}})
-    _req("post", "/api/core/policies", owner, slug,
-         {"permission": PERM, "effect": "deny_if", "condition": GT})
+    _req(
+        "post",
+        "/api/core/users",
+        owner,
+        slug,
+        {
+            "email": f"appr@{slug}.test",
+            "password": "change-me-now",
+            "roles": ["timesheet_approver"],
+        },
+    )
+    appr_id = next(
+        u["id"]
+        for u in _req("get", "/api/core/users", owner, slug).json()
+        if u["email"] == f"appr@{slug}.test"
+    )
+    _req(
+        "put",
+        f"/api/core/users/{appr_id}/attributes",
+        owner,
+        slug,
+        {"attributes": {"approval_limit": 8}},
+    )
+    _req(
+        "post",
+        "/api/core/policies",
+        owner,
+        slug,
+        {"permission": PERM, "effect": "deny_if", "condition": GT},
+    )
 
     _req("post", "/api/timesheets/projects", owner, slug, {"code": "abc", "name": "ABC"})
     proj = _req("get", "/api/timesheets/projects", owner, slug).json()[0]["id"]
 
     def submit_entry(hours):
-        ent = _req("post", "/api/timesheets/entries", owner, slug,
-                   {"project_id": proj, "work_date": "2026-11-10", "hours": hours}).json()
+        ent = _req(
+            "post",
+            "/api/timesheets/entries",
+            owner,
+            slug,
+            {"project_id": proj, "work_date": "2026-11-10", "hours": hours},
+        ).json()
         _req("post", f"/api/timesheets/entries/{ent['id']}/submit", owner, slug)
         return ent["id"]
 

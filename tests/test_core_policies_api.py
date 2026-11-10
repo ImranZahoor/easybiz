@@ -63,7 +63,11 @@ def test_create_and_evaluate_policy(synced, provision):
         "/api/core/policies/evaluate",
         token,
         "pol2",
-        {"permission": "timesheets.entry.approve", "subject": {"approval_limit": 8}, "resource": {"hours": 10}},
+        {
+            "permission": "timesheets.entry.approve",
+            "subject": {"approval_limit": 8},
+            "resource": {"hours": 10},
+        },
     )
     assert ev.status_code == 200 and ev.json()["allowed"] is False
 
@@ -88,7 +92,11 @@ def test_user_attributes_put_get(synced, provision):
     token = _owner(provision, "pol4")
     uid = _req("get", "/api/core/users", token, "pol4").json()[0]["id"]
     put = _req(
-        "put", f"/api/core/users/{uid}/attributes", token, "pol4", {"attributes": {"approval_limit": 8}}
+        "put",
+        f"/api/core/users/{uid}/attributes",
+        token,
+        "pol4",
+        {"attributes": {"approval_limit": 8}},
     )
     assert put.status_code == 200 and put.json()["attributes"] == {"approval_limit": 8}
     got = _req("get", f"/api/core/users/{uid}/attributes", token, "pol4")
@@ -106,6 +114,7 @@ def test_policies_are_tenant_isolated(synced, provision):
         "pola",
         {"permission": "timesheets.entry.approve", "effect": "deny_if", "condition": GT},
     )
-    connection.set_schema_to_public()  # in-process HTTP left us on t_pola; provisioning needs public
+    connection.set_schema_to_public()  # in-process HTTP left t_pola; provisioning needs public
+
     b = _owner(provision, "polb")
     assert _req("get", "/api/core/policies", b, "polb").json() == []

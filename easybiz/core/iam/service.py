@@ -119,7 +119,9 @@ def _abac_decision(policy_dicts, permission: str, env: dict) -> tuple[bool, str 
     return True, None, "no policy applies"
 
 
-def authorize(user_id, permission: str, resource: dict | None = None, context: dict | None = None) -> bool:
+def authorize(
+    user_id, permission: str, resource: dict | None = None, context: dict | None = None
+) -> bool:
     """RBAC must grant first; then ABAC policies decide (deny-overrides, allow-required)."""
     if not has_permission(cache.cached_permissions_for(user_id), permission):
         return False
@@ -185,7 +187,7 @@ def create_policy(
 
 
 def update_policy(tenant, policy_id, *, actor_id, changes: dict) -> Policy:
-    """Apply only the provided fields (permission/effect/condition/priority/description/is_active)."""
+    """Apply only the provided fields (permission/effect/condition/priority/desc/is_active)."""
     pol = get_policy(policy_id)
     if "permission" in changes:
         _assert_policy_permission(tenant, changes["permission"])
@@ -224,7 +226,9 @@ def evaluate_policy(tenant, *, permission, subject: dict, resource: dict, contex
 def set_user_attribute(user_id, key, value, *, actor_id) -> None:
     """Upsert a single subject attribute for a user."""
     UserAttribute.objects.update_or_create(user_id=user_id, key=key, defaults={"value": value})
-    audit.record(actor_id, "user.attribute_set", entity="user_attribute", entity_id=f"{user_id}:{key}")
+    audit.record(
+        actor_id, "user.attribute_set", entity="user_attribute", entity_id=f"{user_id}:{key}"
+    )
     cache.bump_role_version()
 
 

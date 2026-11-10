@@ -13,7 +13,11 @@ ENV = {
 def test_leaf_comparisons():
     assert (
         policy.evaluate_condition(
-            {"op": "gt", "left": {"var": "resource.hours"}, "right": {"var": "subject.approval_limit"}},
+            {
+                "op": "gt",
+                "left": {"var": "resource.hours"},
+                "right": {"var": "subject.approval_limit"},
+            },
             ENV,
         )
         is True
@@ -43,7 +47,10 @@ def test_bool_ops():
         "op": "and",
         "args": [
             {"op": "gt", "left": {"var": "resource.hours"}, "right": 0},
-            {"op": "not", "args": [{"op": "eq", "left": {"var": "resource.status"}, "right": "draft"}]},
+            {
+                "op": "not",
+                "args": [{"op": "eq", "left": {"var": "resource.status"}, "right": "draft"}],
+            },
         ],
     }
     assert policy.evaluate_condition(tree, ENV) is True
@@ -53,7 +60,11 @@ def test_missing_attribute_is_false():
     env = {"subject": {}, "resource": {"hours": 10}, "context": {}}
     assert (
         policy.evaluate_condition(
-            {"op": "gt", "left": {"var": "resource.hours"}, "right": {"var": "subject.approval_limit"}},
+            {
+                "op": "gt",
+                "left": {"var": "resource.hours"},
+                "right": {"var": "subject.approval_limit"},
+            },
             env,
         )
         is False
@@ -70,7 +81,11 @@ def test_incomparable_is_false():
     env = {"subject": {"approval_limit": "high"}, "resource": {"hours": 10}, "context": {}}
     assert (
         policy.evaluate_condition(
-            {"op": "gt", "left": {"var": "resource.hours"}, "right": {"var": "subject.approval_limit"}},
+            {
+                "op": "gt",
+                "left": {"var": "resource.hours"},
+                "right": {"var": "subject.approval_limit"},
+            },
             env,
         )
         is False
@@ -112,7 +127,11 @@ def test_validate_accepts_valid_tree():
         {
             "op": "and",
             "args": [
-                {"op": "gt", "left": {"var": "resource.hours"}, "right": {"var": "subject.approval_limit"}},
+                {
+                    "op": "gt",
+                    "left": {"var": "resource.hours"},
+                    "right": {"var": "subject.approval_limit"},
+                },
                 {"op": "eq", "left": {"var": "context.region"}, "right": "EU"},
             ],
         }
