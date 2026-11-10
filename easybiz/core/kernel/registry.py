@@ -52,9 +52,12 @@ class Registry:
         """A module's `requires_core` range must contain the running core version."""
         core = Version.parse(settings.EASYBIZ_CORE_VERSION)
         for m in self._manifests.values():
-            if m.requires_core is not None and not VersionRange.parse(m.requires_core).contains(core):
+            if m.requires_core is not None and not VersionRange.parse(m.requires_core).contains(
+                core
+            ):
                 raise RegistryError(
-                    f"module {m.id!r} requires_core {m.requires_core}, core is {settings.EASYBIZ_CORE_VERSION}"
+                    f"module {m.id!r} requires_core {m.requires_core}, "
+                    f"core is {settings.EASYBIZ_CORE_VERSION}"
                 )
 
     def _assert_contracts_exist(self) -> None:

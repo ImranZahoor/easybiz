@@ -33,7 +33,12 @@ def test_non_optional_unsatisfiable_consume_rejected():
 
 def test_optional_unsatisfiable_consume_ok():
     r = _reg(
-        {**V2, "id": "hr", "name": "HR", "consumes": [{"contract": "AttendanceProvider", "optional": True}]}
+        {
+            **V2,
+            "id": "hr",
+            "name": "HR",
+            "consumes": [{"contract": "AttendanceProvider", "optional": True}],
+        }
     )
     r.load_order()  # no raise
 
@@ -46,7 +51,12 @@ def test_requires_core_incompatible_rejected():
 
 def test_provides_not_registered_rejected():
     r = _reg(
-        {**V2, "id": "hr", "name": "HR", "provides": [{"contract": "AttendanceProvider", "version": "1.0.0"}]}
+        {
+            **V2,
+            "id": "hr",
+            "name": "HR",
+            "provides": [{"contract": "AttendanceProvider", "version": "1.0.0"}],
+        }
     )
     with pytest.raises(RegistryError):
         r._assert_provides_registered()  # the post-import check, called directly

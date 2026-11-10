@@ -6,6 +6,19 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F17a (module system v2 — manifest v2, validation gaps, capability versioning) — complete.**
+Manifests gain `manifest_version: 2` with versioned `provides`/`consumes` (`{contract, version}` /
+`{contract, range, optional}`), `requires_core` (a semver range checked against the new
+`EASYBIZ_CORE_VERSION`), `extension_points`/`extends` declarations (runtime arrives in F17b), and a
+`sensitive` flag on permissions — all backward compatible with v1 (bare-string `provides`/`consumes`).
+Validation is hand-rolled in `parse_manifest` (no new dependency); `easybiz/core/kernel/manifest.schema.json`
+is the published contract, kept honest by a sync test. The registry now closes the three validation gaps
+(`provides`/`consumes` must name real contracts; a declared `provides` must actually be registered; a
+non-optional `consumes` must be satisfied by a required module) and enforces `requires_core`. Capability
+resolution is version-aware: `capabilities.register(contract, impl, module_id, version)` and
+`get(contract, range=…)` treat an out-of-range provider as unavailable (logged). Timesheets adopts v2 and
+declares its `AttendanceProvider`; `demo` stays v1.
+
 **F14b (authorization v2 — ABAC) — complete.** Attribute-based policies layer on top of
 F14a's RBAC: tenant tables `iam_policy` (`allow_if`/`deny_if` rules with a declarative
 condition tree — operators `eq/ne/lt/lte/gt/gte/in/and/or/not` over `subject.*`/`resource.*`/

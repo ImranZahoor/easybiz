@@ -49,5 +49,7 @@ def _compatible(contract: type, version: str, range: str | None) -> bool:
     if VersionRange.parse(range).contains(Version.parse(version)):
         return True
     name = getattr(contract, "__name__", contract)
-    logger.warning("provider for %r is version %s, incompatible with range %s", name, version, range)
+    logger.warning(
+        "provider for %r is version %s, incompatible with range %s", name, version, range
+    )
     return False
