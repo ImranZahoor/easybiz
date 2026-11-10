@@ -6,4 +6,5 @@ CORE_PERMISSIONS: list[tuple[str, str]] = [
     ("core.user.read", "See users and their roles"),
     ("core.user.manage", "Add, remove, and assign roles to users"),
     ("core.audit.read", "Read the tenant audit log"),
+    ("core.policy.manage", "Create and edit access policies and user attributes"),
 ]

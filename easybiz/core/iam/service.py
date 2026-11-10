@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db import transaction
 from django.db.models import Q
 
 from easybiz.core.audit import service as audit
@@ -233,6 +234,19 @@ def remove_user_attribute(user_id, key, *, actor_id) -> None:
         actor_id, "user.attribute_removed", entity="user_attribute", entity_id=f"{user_id}:{key}"
     )
     cache.bump_role_version()
+
+
+def replace_user_attributes(user_id, attributes: dict, *, actor_id) -> dict:
+    """Replace a user's full attribute map (drop keys not present, upsert the rest)."""
+    with transaction.atomic():
+        UserAttribute.objects.filter(user_id=user_id).exclude(key__in=attributes.keys()).delete()
+        for key, value in attributes.items():
+            UserAttribute.objects.update_or_create(
+                user_id=user_id, key=key, defaults={"value": value}
+            )
+    audit.record(actor_id, "user.attributes_set", entity="user", entity_id=str(user_id))
+    cache.bump_role_version()
+    return subject_attrs(user_id)
 
 
 def menu_for(tenant, perms: set[str]) -> list[dict]:
