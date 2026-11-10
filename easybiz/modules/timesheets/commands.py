@@ -6,6 +6,7 @@ from django.db import transaction
 from easybiz.core.audit import service as audit
 from easybiz.core.errors import DomainError
 from easybiz.core.events import service as events
+from easybiz.core.iam import service as iam
 from easybiz.modules.timesheets import queries
 from easybiz.modules.timesheets.enums import EntryStatus
 from easybiz.modules.timesheets.models import Entry, Project
@@ -89,6 +90,10 @@ def _review(params: ReviewEntryParams, new_status: str, event_name: str) -> Entr
         raise TimesheetError(f"entry is {entry.status}, not submitted", 409)
     if entry.user_id == params.reviewer_id:
         raise TimesheetError("cannot review your own time", 403)
+    if new_status == EntryStatus.APPROVED and not iam.authorize(
+        params.reviewer_id, "timesheets.entry.approve", resource={"hours": float(entry.hours)}
+    ):
+        raise TimesheetError("approval exceeds your approval limit", 403)
     with transaction.atomic():
         entry.status = new_status
         entry.reviewed_by = params.reviewer_id

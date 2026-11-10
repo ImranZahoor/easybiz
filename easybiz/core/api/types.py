@@ -113,3 +113,52 @@ class AuditOut(Schema):
     action: str
     entity: str
     entity_id: str
+
+
+class PolicyIn(Schema):
+    permission: str
+    effect: str
+    condition: dict
+    priority: int = 0
+    description: str = ""
+    is_active: bool = True
+
+
+class PolicyPatch(Schema):
+    permission: str | None = None
+    effect: str | None = None
+    condition: dict | None = None
+    priority: int | None = None
+    description: str | None = None
+    is_active: bool | None = None
+
+
+class PolicyOut(Schema):
+    id: str
+    permission: str
+    effect: str
+    condition: dict
+    priority: int
+    description: str
+    is_active: bool
+
+
+class EvaluateIn(Schema):
+    permission: str
+    subject: dict = {}
+    resource: dict = {}
+    context: dict = {}
+
+
+class EvaluateOut(Schema):
+    allowed: bool
+    decided_by: str | None
+    reason: str
+
+
+class AttributesIn(Schema):
+    attributes: dict
+
+
+class AttributesOut(Schema):
+    attributes: dict

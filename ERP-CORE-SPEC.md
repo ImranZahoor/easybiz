@@ -1095,6 +1095,15 @@ class EmployeeProvider(Protocol):
 - [ ] No endpoint evaluates user-supplied code; expression depth and size are capped.
 - [ ] Isolation and audit tests pass.
 
+**Ownership model — deferred refinement (pairs with F14b / tenant settings).** F14a keeps
+the "≥1 owner" invariant by checking at removal/demotion time (`would_orphan_owner`). A future
+refinement makes ownership a property of a single row instead of a count: a transferable
+`Membership.is_primary_owner` flag — exactly one primary owner per tenant, set at provisioning,
+moved only by an explicit owner-only `transfer_ownership(to_user)`, and the primary owner cannot
+be removed or demoted while they hold it. It must stay **transferable** (not a permanent lock) so
+ownership can move on offboarding; the removal-time check remains the backstop for every other
+owner. Recorded 2026-11-10 after deciding to keep the current invariant for now.
+
 ---
 
 ## 18. Events v2
@@ -1192,6 +1201,25 @@ class EmployeeProvider(Protocol):
 - [ ] Manifest v1 modules still load; v2 fields validate against the JSON Schema; the three validation gaps are closed with tests.
 - [ ] Capability version mismatch is treated as unavailable and logged; tested.
 - [ ] `uninstall_module` refuses while any tenant has a row, and works afterwards.
+
+**Delivery slices.** F17 is large, and several manifest-v2 keys are forward-declarations for
+unbuilt features (`settings`/`jobs`/`numbering`/`workflows`/`custom_fields` → F5–F11, `ui` → F18,
+`permissions.sensitive` enforcement → F20). Build it in four shippable slices, in order
+(b and c build on a's manifest declarations):
+- **F17a — Manifest v2 + validation gaps + capability versioning.** `manifest_version: 2`,
+  `requires_core`, `provides`/`consumes` as `{contract, version/range}`, `manifest.schema.json`
+  enforced at load (it *accepts* the forward-declared keys so v2 manifests validate, but only the
+  live keys — `provides`/`consumes`/`extension_points`/`permissions.sensitive` — get behaviour
+  now), the three validation gaps (#3), and `__contract_version__` resolution (#4; incompatible
+  provider → unavailable, logged).
+- **F17b — Extension points (#4a).** `easybiz/core/kernel/extensions.py` (`register`/`contributors`,
+  per-tenant gated like capabilities), manifest `extension_points`/`extends`, proven on a trivial
+  `demo` point first — the sanctioned way a module extends another's behaviour.
+- **F17c — Contract test kit (#5).** `module_harness`, `run_module_contract_checks`,
+  `check_module <id>`, `pytest -m module_contract` (all the §20.5 checks).
+- **F17d — Scaffold + uninstall (#1, #6, #7).** `startmodule`, `uninstall_module`, deploy runbook.
+
+Recorded 2026-11-10; building F14b (ABAC) first, F17 after.
 
 ---
 

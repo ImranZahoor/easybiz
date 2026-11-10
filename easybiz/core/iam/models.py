@@ -2,6 +2,8 @@ import uuid
 
 from django.db import models
 
+from easybiz.core.iam.enums import PolicyEffect
+
 
 class Role(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -30,3 +32,29 @@ class UserRole(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["user_id", "role"], name="uniq_user_role")]
+
+
+class Policy(models.Model):
+    """An ABAC rule: allow/deny a permission when its condition tree matches (F14b)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    permission = models.CharField(max_length=100)  # exact code or a `module.*` group pattern
+    effect = models.CharField(max_length=20, choices=PolicyEffect.choices())
+    condition = models.JSONField()
+    priority = models.IntegerField(default=0)
+    description = models.CharField(max_length=300, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class UserAttribute(models.Model):
+    """A subject attribute (e.g. ``approval_limit``) keyed by user, supplied to ABAC (F14b)."""
+
+    user_id = models.UUIDField(db_index=True)  # references users_user by value (I2)
+    key = models.CharField(max_length=100)
+    value = models.JSONField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user_id", "key"], name="uniq_user_attribute")
+        ]

@@ -9,10 +9,17 @@ from ninja.responses import Status
 
 from easybiz.core.api.security import authenticated, perm
 from easybiz.core.api.types import (
+    AttributesIn,
+    AttributesOut,
     AuditOut,
     ContextOut,
+    EvaluateIn,
+    EvaluateOut,
     ModuleOut,
     PermissionGroupOut,
+    PolicyIn,
+    PolicyOut,
+    PolicyPatch,
     RoleCloneIn,
     RoleDetailOut,
     RoleIn,
@@ -191,6 +198,72 @@ def clone_role(request, role_id: str, data: RoleCloneIn):
     return Status(201, _role_view(role))
 
 
+def _policy_view(pol) -> PolicyOut:
+    return PolicyOut(
+        id=str(pol.id),
+        permission=pol.permission,
+        effect=pol.effect,
+        condition=pol.condition,
+        priority=pol.priority,
+        description=pol.description,
+        is_active=pol.is_active,
+    )
+
+
+@router.get("/policies", auth=perm("core.policy.manage"), response=list[PolicyOut])
+def list_policies(request):
+    """Every ABAC policy for this tenant, highest priority first."""
+    return [_policy_view(p) for p in iam.list_policies()]
+
+
+@router.post("/policies", auth=perm("core.policy.manage"), response={201: PolicyOut})
+def create_policy(request, data: PolicyIn):
+    pol = iam.create_policy(
+        request.tenant,
+        permission=data.permission,
+        effect=data.effect,
+        condition=data.condition,
+        priority=data.priority,
+        description=data.description,
+        actor_id=request.auth.id,
+    )
+    return Status(201, _policy_view(pol))
+
+
+@router.post("/policies/evaluate", auth=perm("core.policy.manage"), response=EvaluateOut)
+def evaluate_policy(request, data: EvaluateIn):
+    """Dry-run the ABAC layer against a sample subject/resource/context."""
+    return iam.evaluate_policy(
+        request.tenant,
+        permission=data.permission,
+        subject=data.subject,
+        resource=data.resource,
+        context=data.context,
+    )
+
+
+@router.get("/policies/{policy_id}", auth=perm("core.policy.manage"), response=PolicyOut)
+def get_policy(request, policy_id: str):
+    return _policy_view(iam.get_policy(policy_id))
+
+
+@router.patch("/policies/{policy_id}", auth=perm("core.policy.manage"), response=PolicyOut)
+def update_policy(request, policy_id: str, data: PolicyPatch):
+    pol = iam.update_policy(
+        request.tenant,
+        policy_id,
+        actor_id=request.auth.id,
+        changes=data.model_dump(exclude_unset=True),
+    )
+    return _policy_view(pol)
+
+
+@router.delete("/policies/{policy_id}", auth=perm("core.policy.manage"), response={204: None})
+def delete_policy(request, policy_id: str):
+    iam.delete_policy(policy_id, actor_id=request.auth.id)
+    return Status(204, None)
+
+
 def _user_view(user) -> UserOut:
     return UserOut(id=str(user.id), email=user.email, roles=iam.user_role_names(user.id))
 
@@ -272,6 +345,19 @@ def remove_user_role(request, user_id: UUID, name: str):
     """Remove one role from a user."""
     iam.remove_user_role(user_id, name, actor_id=request.auth.id)
     return _user_out(user_id)
+
+
+@router.get("/users/{user_id}/attributes", auth=perm("core.policy.manage"), response=AttributesOut)
+def get_user_attributes(request, user_id: str):
+    """A user's ABAC subject attributes (e.g. ``approval_limit``)."""
+    return AttributesOut(attributes=iam.user_attributes(user_id))
+
+
+@router.put("/users/{user_id}/attributes", auth=perm("core.policy.manage"), response=AttributesOut)
+def put_user_attributes(request, user_id: str, data: AttributesIn):
+    """Replace a user's full attribute map."""
+    attrs = iam.replace_user_attributes(user_id, data.attributes, actor_id=request.auth.id)
+    return AttributesOut(attributes=attrs)
 
 
 @router.get("/audit", auth=perm("core.audit.read"), response=list[AuditOut])

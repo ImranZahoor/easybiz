@@ -26,3 +26,19 @@ def cached_permissions_for(user_id) -> set[str]:
 
     key = f"iam:perms:{_schema()}:{user_id}:{role_version()}"
     return cast("set[str]", cache.get_or_set(key, lambda: service.permissions_for(user_id), 60))
+
+
+def cached_subject_attrs(user_id) -> dict:
+    """``service.subject_attrs`` behind a 60s cache keyed by the role version."""
+    from easybiz.core.iam import service  # lazy: service imports this module
+
+    key = f"iam:attrs:{_schema()}:{user_id}:{role_version()}"
+    return cast("dict", cache.get_or_set(key, lambda: service.subject_attrs(user_id), 60))
+
+
+def cached_active_policies() -> list[dict]:
+    """Active policies (as plain dicts) behind a 60s cache keyed by the role version."""
+    from easybiz.core.iam import service  # lazy: service imports this module
+
+    key = f"iam:policies:{_schema()}:{role_version()}"
+    return cast("list[dict]", cache.get_or_set(key, service.active_policy_dicts, 60))
