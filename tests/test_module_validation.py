@@ -49,6 +49,15 @@ def test_requires_core_incompatible_rejected():
         r.load_order()
 
 
+def test_consumes_non_contract_attribute_rejected():
+    # "Decimal" is importable from easybiz.core.contracts but is not a real contract
+    r = _reg(
+        {**V2, "id": "hr", "name": "HR", "consumes": [{"contract": "Decimal", "optional": True}]}
+    )
+    with pytest.raises(RegistryError):
+        r.load_order()
+
+
 def test_provides_not_registered_rejected():
     r = _reg(
         {

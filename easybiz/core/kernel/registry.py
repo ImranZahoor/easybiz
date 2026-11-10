@@ -61,11 +61,12 @@ class Registry:
                 )
 
     def _assert_contracts_exist(self) -> None:
-        """Every provides/consumes contract must be a name defined in easybiz.core.contracts."""
+        """Every provides/consumes contract must be a real contract in easybiz.core.contracts."""
         for m in self._manifests.values():
             names = [c for c, _ in m.provides] + [c for c, _, _ in m.consumes]
             for name in names:
-                if not hasattr(contracts, name):
+                obj = getattr(contracts, name, None)
+                if not (isinstance(obj, type) and hasattr(obj, "__contract_version__")):
                     raise RegistryError(f"module {m.id!r} names unknown contract {name!r}")
 
     def _assert_consumes_satisfiable(self) -> None:
