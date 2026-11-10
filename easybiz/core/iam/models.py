@@ -8,6 +8,9 @@ class Role(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=300, blank=True)
     is_system = models.BooleanField(default=False)
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
 

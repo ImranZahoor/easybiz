@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from django.db import transaction
 from ninja import Router
 from ninja.errors import HttpError
@@ -10,22 +12,27 @@ from easybiz.core.api.types import (
     AuditOut,
     ContextOut,
     ModuleOut,
+    PermissionGroupOut,
+    RoleCloneIn,
+    RoleDetailOut,
     RoleIn,
     RoleOut,
+    RoleUpdateIn,
     TenantSummary,
     UserIn,
     UserOut,
+    UserRolesIn,
 )
 from easybiz.core.audit import service as audit
 from easybiz.core.audit.models import AuditLog
 from easybiz.core.catalog.models import TenantModule
 from easybiz.core.events import service as events
 from easybiz.core.iam import service as iam
-from easybiz.core.iam.models import Role, UserRole
+from easybiz.core.iam.models import UserRole
 from easybiz.core.kernel import lifecycle, state
 from easybiz.core.kernel.registry import registry
 from easybiz.core.users import service as users
-from easybiz.core.users.models import Membership
+from easybiz.core.users.models import Membership, User
 
 router = Router()
 
@@ -114,22 +121,78 @@ def _role_view(role) -> RoleOut:
 
 @router.get("/roles", auth=perm("core.role.read"), response=list[RoleOut])
 def list_roles(request):
-    return [_role_view(r) for r in Role.objects.order_by("name")]
+    return [_role_view(r) for r in iam.list_roles()]
+
+
+@router.get("/permissions", auth=perm("core.role.read"), response=list[PermissionGroupOut])
+def list_permissions(request):
+    """Assignable permissions for this tenant, grouped by module."""
+    return iam.permission_groups(request.tenant)
+
+
+@router.get("/roles/{role_id}", auth=perm("core.role.read"), response=RoleDetailOut)
+def get_role(request, role_id: UUID):
+    """One role with its parent and effective (own + inherited) permissions."""
+    role = iam.get_role(role_id)
+    return RoleDetailOut(
+        id=str(role.id),
+        name=role.name,
+        description=role.description,
+        is_system=role.is_system,
+        parent=role.parent.name if role.parent else None,
+        permissions=iam.role_permissions(role),
+        effective_permissions=sorted(iam.effective_codes(role)),
+    )
 
 
 @router.post("/roles", auth=perm("core.role.manage"), response={201: RoleOut})
 def create_role(request, data: RoleIn):
-    try:
-        role = iam.create_role(request.tenant, data.name, data.permissions, data.description)
-    except iam.RoleError as exc:
-        raise HttpError(422, str(exc)) from exc
+    role = iam.create_role(
+        request.tenant,
+        data.name,
+        data.permissions,
+        data.description,
+        actor_perms=iam.permissions_for(request.auth.id),
+    )
     audit.record(request.auth.id, "role.created", entity="role", entity_id=str(role.id))
     return Status(201, _role_view(role))
 
 
+@router.patch("/roles/{role_id}", auth=perm("core.role.manage"), response=RoleOut)
+def update_role(request, role_id: str, data: RoleUpdateIn):
+    """Change name/description/permissions/parent (system roles: description only)."""
+    role = iam.update_role(
+        request.tenant,
+        role_id,
+        actor_id=request.auth.id,
+        actor_perms=iam.permissions_for(request.auth.id),
+        changes=data.model_dump(exclude_unset=True),
+    )
+    return _role_view(role)
+
+
+@router.delete("/roles/{role_id}", auth=perm("core.role.manage"), response={204: None})
+def delete_role(request, role_id: str, force: bool = False):
+    """Delete a non-system role; needs ?force=true if still assigned."""
+    iam.delete_role(role_id, force=force, actor_id=request.auth.id)
+    return Status(204, None)
+
+
+@router.post("/roles/{role_id}/clone", auth=perm("core.role.manage"), response={201: RoleOut})
+def clone_role(request, role_id: str, data: RoleCloneIn):
+    """Duplicate a role's permissions and parent under a new name."""
+    role = iam.clone_role(
+        request.tenant,
+        role_id,
+        data.name,
+        actor_id=request.auth.id,
+        actor_perms=iam.permissions_for(request.auth.id),
+    )
+    return Status(201, _role_view(role))
+
+
 def _user_view(user) -> UserOut:
-    role_names = UserRole.objects.filter(user_id=user.id).values_list("role__name", flat=True)
-    return UserOut(id=str(user.id), email=user.email, roles=sorted(role_names))
+    return UserOut(id=str(user.id), email=user.email, roles=iam.user_role_names(user.id))
 
 
 @router.get("/users", auth=perm("core.user.read"), response=list[UserOut])
@@ -148,7 +211,12 @@ def create_user(request, data: UserIn):
             user = users.create_user(
                 data.email, request.tenant, password=data.password, name=data.name
             )
-            iam.set_user_roles(user.id, data.roles)
+            iam.set_user_roles(
+                user.id,
+                data.roles,
+                actor_id=request.auth.id,
+                actor_perms=iam.permissions_for(request.auth.id),
+            )
     except (users.WeakPassword, iam.RoleError) as exc:
         raise HttpError(422, str(exc)) from exc
     audit.record(request.auth.id, "user.added", entity="user", entity_id=str(user.id))
@@ -162,11 +230,48 @@ def delete_user(request, user_id: str):
     membership = Membership.objects.filter(tenant=request.tenant, user_id=user_id).first()
     if membership is None:
         raise HttpError(404, "user is not a member of this tenant")
+    if iam.would_orphan_owner(user_id):
+        raise HttpError(409, "cannot remove the last owner")
     UserRole.objects.filter(user_id=user_id).delete()
     membership.delete()
     events.publish("core.membership.removed", {"user_id": user_id})
     audit.record(request.auth.id, "user.removed", entity="user", entity_id=user_id)
     return Status(204, None)
+
+
+def _user_out(user_id: UUID) -> UserOut:
+    user = User.objects.filter(id=user_id).first()
+    if user is None:
+        raise HttpError(404, "user not found")
+    return _user_view(user)
+
+
+@router.put("/users/{user_id}/roles", auth=perm("core.user.manage"), response=UserOut)
+def set_user_roles(request, user_id: UUID, data: UserRolesIn):
+    """Replace a user's role set."""
+    iam.set_user_roles(
+        user_id,
+        data.roles,
+        actor_id=request.auth.id,
+        actor_perms=iam.permissions_for(request.auth.id),
+    )
+    return _user_out(user_id)
+
+
+@router.post("/users/{user_id}/roles/{name}", auth=perm("core.user.manage"), response=UserOut)
+def add_user_role(request, user_id: UUID, name: str):
+    """Grant one role to a user."""
+    iam.add_user_role(
+        user_id, name, actor_id=request.auth.id, actor_perms=iam.permissions_for(request.auth.id)
+    )
+    return _user_out(user_id)
+
+
+@router.delete("/users/{user_id}/roles/{name}", auth=perm("core.user.manage"), response=UserOut)
+def remove_user_role(request, user_id: UUID, name: str):
+    """Remove one role from a user."""
+    iam.remove_user_role(user_id, name, actor_id=request.auth.id)
+    return _user_out(user_id)
 
 
 @router.get("/audit", auth=perm("core.audit.read"), response=list[AuditOut])

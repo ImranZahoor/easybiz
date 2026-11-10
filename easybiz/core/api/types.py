@@ -59,6 +59,37 @@ class RoleOut(Schema):
     permissions: list[str]
 
 
+class RoleUpdateIn(Schema):
+    name: str | None = None
+    description: str | None = None
+    permissions: list[str] | None = None
+    parent: str | None = None
+
+
+class RoleCloneIn(Schema):
+    name: str
+
+
+class RoleDetailOut(Schema):
+    id: str
+    name: str
+    description: str
+    is_system: bool
+    parent: str | None = None
+    permissions: list[str]
+    effective_permissions: list[str]
+
+
+class PermissionItemOut(Schema):
+    code: str
+    description: str = ""
+
+
+class PermissionGroupOut(Schema):
+    module: str
+    permissions: list[PermissionItemOut]
+
+
 class UserIn(Schema):
     email: str
     password: str | None = None
@@ -69,6 +100,10 @@ class UserIn(Schema):
 class UserOut(Schema):
     id: str
     email: str
+    roles: list[str]
+
+
+class UserRolesIn(Schema):
     roles: list[str]
 
 

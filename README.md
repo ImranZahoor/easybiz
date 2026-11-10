@@ -6,6 +6,14 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F14a (authorization v2 — roles) — complete.** Part B begins here: full role
+administration — `GET`/`PATCH`/`DELETE`/`clone` roles, `PUT`/`POST`/`DELETE` user-role
+assignment, `GET /core/permissions` (grouped by module), `GET /core/roles/{id}` (parent +
+effective permissions) — plus **role inheritance** (a role's permissions are the union with
+its ancestors', cycle-guarded), the guards (no define- or assign-time privilege escalation,
+last-`owner` protection, system-role lock), a `core.role.changed` event on every change, and
+a version-counter permission cache on the auth path. ABAC and org-scope remain **F14b / F3**.
+
 **M7 (platform admin API) — complete.** The operator plane on the public host:
 `PlatformJWTAuth` (public-host-only, `scope="platform"` tokens, `is_platform_admin`
 read live so demotion is immediate), throttled `POST /api/platform/auth/login`, and
@@ -63,10 +71,10 @@ and a live end-to-end operator run passes: create a platform admin, create a ten
 HTTP, the owner logs in on the tenant host, enable a module, suspend (tenant login then
 403), and delete (schema dropped, 404 after) — every step audited in order.
 
-Next is **Part B** (F1–F22): HR and Payroll (to prove cross-module dependencies and
-capabilities), then settings/flags, events v2, jobs, and the rest. Multiple auth methods
-(2FA, magic link, social/SSO, refresh tokens) are deferred to **F13**; role inheritance to
-**F14**; Celery-backed dispatch, delivery leases, and retention to **F15**.
+**Part B** (F1–F22) is underway, foundations first: **F14a done** → next **F14b** (ABAC) and
+**F17** (module system v2), then settings/flags, events v2, jobs, and eventually HR/Payroll
+(F1/F2) on the hardened base. **F23** (agent tooling: MCP + chatbot) is planned after F14.
+Multiple auth methods (2FA, magic link, social/SSO) are **F13**; Celery-backed dispatch to **F15**.
 
 ## Prerequisites
 

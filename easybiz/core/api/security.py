@@ -8,6 +8,7 @@ from django_tenants.utils import get_public_schema_name
 from ninja.errors import HttpError
 from ninja.security import HttpBearer
 
+from easybiz.core.iam import cache as iam_cache
 from easybiz.core.iam import service as iam
 from easybiz.core.users.models import Membership, User
 
@@ -65,7 +66,7 @@ class TenantJWTAuth(HttpBearer):
 
     @staticmethod
     def _grants(user, permission: str) -> bool:
-        return iam.has_permission(iam.permissions_for(user.id), permission)
+        return iam.has_permission(iam_cache.cached_permissions_for(user.id), permission)
 
 
 def perm(code: str) -> TenantJWTAuth:
