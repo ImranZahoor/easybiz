@@ -6,6 +6,16 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F17b (module system v2 — extension points) — complete.** The multi-provider sibling of
+capabilities: `easybiz/core/kernel/extensions.py` offers `register(point, impl, module_id)` (many
+contributors per point) and `contributors(point)` — every contributor whose module is enabled for the
+current tenant, in dependency/load order, semantics-free (the host module decides all-pass / collect /
+first-wins). The registry validates the manifest `extension_points`/`extends` declarations F17a parses:
+a point's contract must be real, point names are unique, and an `extends` must name a declared point of a
+module it `requires`/`optional`s at a compatible version. The `demo` module (now v2) hosts a trivial
+`demo.greeters` point (contract `DemoGreeter`) with a `greetings.all_greetings()` fan-out, proving the
+host→contributor path. A module is the plugin unit — there is no separate plugin subsystem.
+
 **F17a (module system v2 — manifest v2, validation gaps, capability versioning) — complete.**
 Manifests gain `manifest_version: 2` with versioned `provides`/`consumes` (`{contract, version}` /
 `{contract, range, optional}`), `requires_core` (a semver range checked against the new

@@ -24,6 +24,8 @@ def contributors(point: str) -> list:
     tenant = getattr(connection, "tenant", None)
     if tenant is None:
         return []
-    entries = [(impl, mid) for impl, mid in _contributors.get(point, []) if state.is_enabled(tenant, mid)]
+    entries = [
+        (impl, mid) for impl, mid in _contributors.get(point, []) if state.is_enabled(tenant, mid)
+    ]
     order = registry.load_order()
     return [impl for impl, _ in sorted(entries, key=lambda e: order.index(e[1]))]

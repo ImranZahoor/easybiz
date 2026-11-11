@@ -16,7 +16,12 @@ def _reg(*manifests):
 
 def test_extension_point_unknown_contract_rejected():
     r = _reg(
-        {**V2, "id": "demo", "name": "D", "extension_points": [{"name": "demo.p", "contract": "Nope"}]}
+        {
+            **V2,
+            "id": "demo",
+            "name": "D",
+            "extension_points": [{"name": "demo.p", "contract": "Nope"}],
+        }
     )
     with pytest.raises(RegistryError):
         r.load_order()
@@ -30,7 +35,12 @@ def test_extends_unknown_point_rejected():
 
 def test_extends_requires_host():
     host = {**V2, "id": "demo", "name": "D", "extension_points": [POINT]}
-    ext = {**V2, "id": "hr", "name": "HR", "extends": [{"point": "demo.p"}]}  # does not require demo
+    ext = {
+        **V2,
+        "id": "hr",
+        "name": "HR",
+        "extends": [{"point": "demo.p"}],
+    }  # does not require demo
     with pytest.raises(RegistryError):
         _reg(host, ext).load_order()
 

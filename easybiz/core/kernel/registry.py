@@ -75,18 +75,20 @@ class Registry:
                     raise RegistryError(f"module {m.id!r} names unknown contract {name!r}")
 
     def _points_index(self) -> dict[str, tuple[str, str]]:
-        """Map every declared extension point name to (host_module_id, version); reject duplicates."""
+        """Map each extension point name to (host_module_id, version); reject duplicates."""
         index: dict[str, tuple[str, str]] = {}
         for m in self._manifests.values():
             for ep in m.extension_points:
                 name = ep["name"]
                 if name in index:
-                    raise RegistryError(f"extension point {name!r} declared by more than one module")
+                    raise RegistryError(
+                        f"extension point {name!r} declared by more than one module"
+                    )
                 index[name] = (m.id, ep.get("version", "1.0.0"))
         return index
 
     def _assert_extends_valid(self) -> None:
-        """An `extends` must name a declared point of a required/optional host, version-compatible."""
+        """An `extends` must name a declared point of a required host, version-compatible."""
         points = self._points_index()
         for m in self._manifests.values():
             hosts = {dep for dep, _ in m.requires} | {dep for dep, _ in m.optional}
@@ -97,7 +99,8 @@ class Registry:
                 host_id, version = points[name]
                 if host_id not in hosts:
                     raise RegistryError(
-                        f"module {m.id!r} extends {name!r} but does not require/optional its host {host_id!r}"
+                        f"module {m.id!r} extends {name!r} but does not "
+                        f"require/optional its host {host_id!r}"
                     )
                 rng = ext.get("range")
                 if rng is not None and not VersionRange.parse(rng).contains(Version.parse(version)):
