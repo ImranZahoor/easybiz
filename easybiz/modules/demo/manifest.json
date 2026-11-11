@@ -2,6 +2,10 @@
   "id": "demo",
   "name": "Demo",
   "version": "0.1.0",
+  "manifest_version": 2,
+  "extension_points": [
+    {"name": "demo.greeters", "contract": "DemoGreeter", "version": "1.0.0"}
+  ],
   "permissions": [{"code": "demo.widget.read", "description": "See demo widgets"}],
   "roles": [
     {"name": "demo_viewer", "description": "Views widgets", "permissions": ["demo.widget.read"]}

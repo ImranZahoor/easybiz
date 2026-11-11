@@ -46,6 +46,7 @@ class Registry:
         self._assert_requires_core()
         self._assert_contracts_exist()
         self._assert_consumes_satisfiable()
+        self._assert_extends_valid()
         return self._topological_order()
 
     def _assert_requires_core(self) -> None:
@@ -61,13 +62,51 @@ class Registry:
                 )
 
     def _assert_contracts_exist(self) -> None:
-        """Every provides/consumes contract must be a real contract in easybiz.core.contracts."""
+        """Every provides/consumes/extension-point contract must be a real contract."""
         for m in self._manifests.values():
-            names = [c for c, _ in m.provides] + [c for c, _, _ in m.consumes]
+            names = (
+                [c for c, _ in m.provides]
+                + [c for c, _, _ in m.consumes]
+                + [ep["contract"] for ep in m.extension_points]
+            )
             for name in names:
                 obj = getattr(contracts, name, None)
                 if not (isinstance(obj, type) and hasattr(obj, "__contract_version__")):
                     raise RegistryError(f"module {m.id!r} names unknown contract {name!r}")
+
+    def _points_index(self) -> dict[str, tuple[str, str]]:
+        """Map each extension point name to (host_module_id, version); reject duplicates."""
+        index: dict[str, tuple[str, str]] = {}
+        for m in self._manifests.values():
+            for ep in m.extension_points:
+                name = ep["name"]
+                if name in index:
+                    raise RegistryError(
+                        f"extension point {name!r} declared by more than one module"
+                    )
+                index[name] = (m.id, ep.get("version", "1.0.0"))
+        return index
+
+    def _assert_extends_valid(self) -> None:
+        """An `extends` must name a declared point of a required host, version-compatible."""
+        points = self._points_index()
+        for m in self._manifests.values():
+            hosts = {dep for dep, _ in m.requires} | {dep for dep, _ in m.optional}
+            for ext in m.extends:
+                name = ext["point"]
+                if name not in points:
+                    raise RegistryError(f"module {m.id!r} extends unknown point {name!r}")
+                host_id, version = points[name]
+                if host_id not in hosts:
+                    raise RegistryError(
+                        f"module {m.id!r} extends {name!r} but does not "
+                        f"require/optional its host {host_id!r}"
+                    )
+                rng = ext.get("range")
+                if rng is not None and not VersionRange.parse(rng).contains(Version.parse(version)):
+                    raise RegistryError(
+                        f"module {m.id!r} extends {name!r} {rng}, point is {version}"
+                    )
 
     def _assert_consumes_satisfiable(self) -> None:
         """A non-optional consume must be provided by one of the module's `requires` targets."""

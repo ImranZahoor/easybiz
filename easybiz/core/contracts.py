@@ -13,3 +13,12 @@ class AttendanceProvider(Protocol):
     __contract_version__: str = "1.0.0"
 
     def approved_hours(self, user_id: UUID, start: date, end: date) -> Decimal: ...
+
+
+@runtime_checkable
+class DemoGreeter(Protocol):
+    """A trivial extension-point contract: contribute a greeting (hosted by the demo module)."""
+
+    __contract_version__: str = "1.0.0"
+
+    def greet(self) -> str: ...

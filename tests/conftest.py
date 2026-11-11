@@ -53,6 +53,17 @@ def _reset_capabilities():
 
 
 @pytest.fixture(autouse=True)
+def _reset_extensions():
+    """Isolate the process-global extension-point registry between tests."""
+    from easybiz.core.kernel import extensions
+
+    saved = {k: list(v) for k, v in extensions._contributors.items()}
+    yield
+    extensions._contributors.clear()
+    extensions._contributors.update(saved)
+
+
+@pytest.fixture(autouse=True)
 def _reset_cache():
     """Clear the cache each test so the platform-login throttle starts fresh."""
     from django.core.cache import cache
