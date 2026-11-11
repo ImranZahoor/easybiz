@@ -2,9 +2,10 @@
   "id": "timesheets",
   "name": "Timesheets",
   "version": "0.1.0",
+  "manifest_version": 2,
   "requires": [],
   "optional": [],
-  "provides": [],
+  "provides": [{"contract": "AttendanceProvider", "version": "1.0.0"}],
   "consumes": [],
   "permissions": [
     {"code": "timesheets.project.read", "description": "View projects"},

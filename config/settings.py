@@ -18,6 +18,8 @@ ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", ".localhost,127.0.0.1").s
 if not DEBUG and SECRET_KEY.startswith("dev-insecure"):
     raise RuntimeError("DJANGO_SECRET_KEY must be set in production")
 
+EASYBIZ_CORE_VERSION = os.environ.get("EASYBIZ_CORE_VERSION", "1.0.0")
+
 EASYBIZ_MODULE_PACKAGES = discover_module_packages(
     [
         p

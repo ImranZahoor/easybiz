@@ -14,4 +14,4 @@ class TimesheetsAttendance:
         return queries.approved_hours(user_id, start, end)
 
 
-capabilities.register(AttendanceProvider, TimesheetsAttendance(), "timesheets")
+capabilities.register(AttendanceProvider, TimesheetsAttendance(), "timesheets", version="1.0.0")

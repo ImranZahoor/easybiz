@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://easybiz.dev/schemas/manifest.schema.json",
+  "title": "Easybiz module manifest (v2)",
+  "description": "Published contract for a module's manifest.json. The hand-rolled parser in manifest.py is the enforcement; this file documents the shape and is kept in sync by a test. Forward-declared keys (settings/jobs/numbering/workflows/custom_fields/ui) are documented for features F5-F18 and accepted-but-ignored until those land.",
+  "type": "object",
+  "required": ["id", "name", "version"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,30}$"},
+    "name": {"type": "string"},
+    "version": {"type": "string", "pattern": "^\\d+(\\.\\d+){0,2}$"},
+    "manifest_version": {"type": "integer", "enum": [1, 2]},
+    "requires_core": {"type": "string", "description": "semver range checked against EASYBIZ_CORE_VERSION"},
+    "requires": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["module"],
+        "properties": {"module": {"type": "string"}, "range": {"type": "string"}}
+      }
+    },
+    "optional": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["module"],
+        "properties": {"module": {"type": "string"}, "range": {"type": "string"}}
+      }
+    },
+    "provides": {
+      "type": "array",
+      "description": "v2: objects {contract, version}; v1: bare contract-name strings.",
+      "items": {
+        "type": "object",
+        "required": ["contract"],
+        "properties": {"contract": {"type": "string"}, "version": {"type": "string"}}
+      }
+    },
+    "consumes": {
+      "type": "array",
+      "description": "v2: objects {contract, range, optional}; v1: bare contract-name strings.",
+      "items": {
+        "type": "object",
+        "required": ["contract"],
+        "properties": {
+          "contract": {"type": "string"},
+          "range": {"type": "string"},
+          "optional": {"type": "boolean"}
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code"],
+        "properties": {
+          "code": {"type": "string"},
+          "description": {"type": "string"},
+          "sensitive": {"type": "boolean"}
+        }
+      }
+    },
+    "roles": {"type": "array", "items": {"type": "object"}},
+    "events": {
+      "type": "object",
+      "properties": {
+        "publishes": {"type": "array", "items": {"type": "string"}},
+        "subscribes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "menu": {"type": "array", "items": {"type": "object"}},
+    "extension_points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "contract"],
+        "properties": {
+          "name": {"type": "string"},
+          "contract": {"type": "string"},
+          "version": {"type": "string"}
+        }
+      }
+    },
+    "extends": {
+      "type": "array",
+      "items": {"type": "object", "required": ["point"], "properties": {"point": {"type": "string"}}}
+    },
+
+    "settings": {"type": "array", "description": "Forward-declared (F5); accepted but not yet enforced."},
+    "jobs": {"type": "array", "description": "Forward-declared (F11); accepted but not yet enforced."},
+    "numbering": {"type": "array", "description": "Forward-declared (F7); accepted but not yet enforced."},
+    "workflows": {"type": "array", "description": "Forward-declared (F8); accepted but not yet enforced."},
+    "custom_fields": {"type": "array", "description": "Forward-declared (F6); accepted but not yet enforced."},
+    "ui": {"type": "object", "description": "Forward-declared (F18); accepted but not yet enforced."}
+  }
+}

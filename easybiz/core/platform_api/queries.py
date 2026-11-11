@@ -108,7 +108,7 @@ def _catalog_view(module_id: str) -> ModuleCatalogOut:
         state=state,
         requires=[dep for dep, _ in manifest.requires] if manifest else [],
         optional=[dep for dep, _ in manifest.optional] if manifest else [],
-        provides=list(manifest.provides) if manifest else [],
+        provides=[c for c, _ in manifest.provides] if manifest else [],
         publishes=list(manifest.publishes) if manifest else [],
         subscribes=list(manifest.subscribes) if manifest else [],
         permissions=[ModulePermOut(code=c, description=d) for c, d in manifest.permissions]

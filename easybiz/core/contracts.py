@@ -10,4 +10,6 @@ from uuid import UUID
 class AttendanceProvider(Protocol):
     """Approved working hours for a user in a date range (provided by Timesheets)."""
 
+    __contract_version__: str = "1.0.0"
+
     def approved_hours(self, user_id: UUID, start: date, end: date) -> Decimal: ...
