@@ -6,6 +6,17 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F17d (module system v2 — scaffold, uninstall, runbook) — complete. F17 is done.**
+`python manage.py startmodule <id> [--requires ..] [--optional ..] [--path ..]` scaffolds a
+worked-sample, contract-clean module (sample model + templated initial migration, a guarded
+endpoint, a default role, and its own contract test), validates the id, never overwrites an
+existing directory, and appends the package to `.env`'s `EASYBIZ_MODULES`.
+`python manage.py uninstall_module <id>` removes a module from the catalog (its `Module` +
+`Permission` rows), refusing while any tenant still holds a `TenantModule` row; code removal
+stays a deploy step. The rolling module-deploy runbook is at
+[`docs/runbooks/module-deploy.md`](docs/runbooks/module-deploy.md) (note the D9 limit: new
+module code needs a restart; enable/disable is instant).
+
 **F17c (module system v2 — contract test kit) — complete.** `easybiz/core/testing` provides
 `module_harness(module_id, with_=, without=)` (a throwaway tenant with the module + hard deps, torn
 down after) and `run_module_contract_checks(module_id)` — eleven checks that a module obeys the module

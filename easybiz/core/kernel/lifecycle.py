@@ -155,6 +155,16 @@ def remove_module_data(tenant, module_id: str, actor_id=None, policy: str = "dro
     row.delete()
 
 
+def uninstall_module(module_id: str) -> None:
+    """Remove a module from the catalog; refuse while any tenant still holds a row (D-level)."""
+    if not Module.objects.filter(id=module_id).exists():
+        raise LifecycleError(f"module {module_id!r} is not in the catalog")
+    if TenantModule.objects.filter(module_id=module_id).exists():
+        raise LifecycleError(f"cannot uninstall {module_id!r}; a tenant still has it installed")
+    Permission.objects.filter(module_id=module_id).delete()
+    Module.objects.filter(id=module_id).delete()
+
+
 def upgrade_modules() -> list[str]:
     order = sync_catalog()
     call_command("migrate_schemas", verbosity=0)
