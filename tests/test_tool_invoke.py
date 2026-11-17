@@ -78,6 +78,33 @@ def test_happy_path_invokes_and_audits(synced, db_tenant):
         assert AuditLog.objects.filter(action="tool.invoked", entity_id="t.read").exists()
 
 
+def test_non_dict_input_422(synced, db_tenant):
+    with tenant_context(db_tenant):
+        _register(name="t.in", perm=None, input_schema=_LimitIn)
+        uid = _reader([])
+        with pytest.raises(service.ToolError) as e:
+            service.invoke("t.in", [1, 2], user_id=uid)
+        assert e.value.status == 422
+
+
+def test_extra_input_key_422(synced, db_tenant):
+    with tenant_context(db_tenant):
+        _register(name="t.in2", perm=None, input_schema=_LimitIn)
+        uid = _reader([])
+        with pytest.raises(service.ToolError) as e:
+            service.invoke("t.in2", {"limit": 5, "evil": 1}, user_id=uid)
+        assert e.value.status == 422
+
+
+def test_no_input_tool_rejects_inputs_422(synced, db_tenant):
+    with tenant_context(db_tenant):
+        _register(name="t.none", perm=None, input_schema=None)
+        uid = _reader([])
+        with pytest.raises(service.ToolError) as e:
+            service.invoke("t.none", {"evil": 1}, user_id=uid)
+        assert e.value.status == 422
+
+
 def test_accessible_filters_by_permission(synced, db_tenant):
     with tenant_context(db_tenant):
         _register()  # perm core.audit.read

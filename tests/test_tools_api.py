@@ -55,6 +55,12 @@ def test_invoke_happy(synced, provision):
     assert r.status_code == 200 and "enabled_modules" in r.json()
 
 
+def test_invoke_malformed_json_422(synced, provision):
+    token = _owner(provision, "t5")
+    r = _req("post", "/api/tools/core.context/invoke", token, "t5", "not-json")
+    assert r.status_code == 422
+
+
 def test_invoke_denied_for_unscoped_user(synced, provision):
     _owner(provision, "t4")
     tenant = Tenant.objects.get(slug="t4")

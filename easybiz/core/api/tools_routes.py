@@ -36,5 +36,8 @@ def describe_tool(request, name: str):
 @router.post("/{name}/invoke", auth=authenticated)
 def invoke_tool(request, name: str):
     """Invoke a tool with a JSON body; perm/tier/validation enforced by the service."""
-    body = json.loads(request.body or b"{}")
+    try:
+        body = json.loads(request.body or b"{}")
+    except json.JSONDecodeError as exc:
+        raise service.ToolError("invalid JSON body", 422) from exc
     return service.invoke(name, body, user_id=request.auth.id)
