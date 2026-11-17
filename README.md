@@ -6,6 +6,16 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F17c (module system v2 — contract test kit) — complete.** `easybiz/core/testing` provides
+`module_harness(module_id, with_=, without=)` (a throwaway tenant with the module + hard deps, torn
+down after) and `run_module_contract_checks(module_id)` — eleven checks that a module obeys the module
+contract: manifest/app-label, endpoint permissions declared (Ninja introspection), subscriptions have
+handlers, no cross-module imports (AST scan), no cross-module FKs + table prefix (`_meta`), migrations
+reversible, lifecycle enable/disable/remove/re-enable, schema isolation, handler wiring, optional-dep
+matrix, and the gate answering 404 when disabled. `python manage.py check_module <id>` prints failures
+(nonzero exit on any); `pytest -m module_contract` runs the suite against `timesheets`/`demo` (both
+green) with negative tests breaking each rule. Pragmatic depth: payload-schema matching defers to F15.
+
 **F17b (module system v2 — extension points) — complete.** The multi-provider sibling of
 capabilities: `easybiz/core/kernel/extensions.py` offers `register(point, impl, module_id)` (many
 contributors per point) and `contributors(point)` — every contributor whose module is enabled for the

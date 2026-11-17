@@ -50,7 +50,7 @@ def _undeclared_endpoint_perms(perms_used: set[str], declared: set[str]) -> set[
 
 
 def check_endpoint_permissions(module_id: str) -> list[str]:
-    """Every permission an endpoint guards on is declared by the module (or is a core permission)."""
+    """Every permission an endpoint guards on is declared by the module (or is core)."""
     router = _module_router(module_id)
     if router is None:
         return []
@@ -72,7 +72,7 @@ def _missing_handlers(manifest: Manifest) -> list[str]:
 
 
 def check_events(module_id: str) -> list[str]:
-    """Every subscribed event has a registered handler (publish declaration is enforced elsewhere)."""
+    """Every subscribed event has a registered handler (publish declaration enforced elsewhere)."""
     manifest = registry.manifest(module_id)
     if manifest is None:
         return [f"{module_id}: no loaded manifest"]
@@ -106,10 +106,12 @@ def check_no_cross_imports(module_id: str) -> list[str]:
     if spec is None or not spec.submodule_search_locations:
         return [f"{module_id}: package not importable"]
     location = next(iter(spec.submodule_search_locations))
-    return [f"{module_id}: imports another module {m!r}" for m in _scan_imports(location, module_id)]
+    return [
+        f"{module_id}: imports another module {m!r}" for m in _scan_imports(location, module_id)
+    ]
 
 
-def _relation_offenders(model: type, module_id: str) -> list[str]:
+def _relation_offenders(model, module_id: str) -> list[str]:
     """Concrete relation fields on ``model`` whose target lives in another app."""
     offenders: list[str] = []
     for field in model._meta.get_fields():
@@ -137,9 +139,7 @@ def check_no_cross_fk_and_prefix(module_id: str) -> list[str]:
 
 def _table_in_schema(table: str, schema: str) -> bool:
     with connection.cursor() as cur:
-        cur.execute(
-            "SELECT 1 FROM pg_tables WHERE schemaname=%s AND tablename=%s", [schema, table]
-        )
+        cur.execute("SELECT 1 FROM pg_tables WHERE schemaname=%s AND tablename=%s", [schema, table])
         return cur.fetchone() is not None
 
 

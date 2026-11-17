@@ -31,7 +31,7 @@ def _deps_closure(module_id: str) -> set[str]:
 def module_harness(
     module_id: str, with_: Iterable[str] = (), without: Iterable[str] = ()
 ) -> Iterator[Tenant]:
-    """Provision a throwaway tenant with ``module_id`` + hard deps (+with_, -without), then drop it."""
+    """Provision a throwaway tenant with the module + hard deps (+with_, -without), then drop it."""
     mods = ({module_id} | _deps_closure(module_id) | set(with_)) - set(without)
     slug = f"ct{module_id.replace('_', '')}{uuid.uuid4().hex[:6]}"
     email = f"owner@{slug}.test"

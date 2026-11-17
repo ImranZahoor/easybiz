@@ -22,7 +22,9 @@ def test_cross_import_flagged(tmp_path):
 
 
 def test_endpoint_permission_undeclared_flagged():
-    bad = checks._undeclared_endpoint_perms(perms_used={"demo.secret"}, declared={"demo.widget.read"})
+    bad = checks._undeclared_endpoint_perms(
+        perms_used={"demo.secret"}, declared={"demo.widget.read"}
+    )
     assert bad == {"demo.secret"}
 
 
@@ -47,6 +49,11 @@ def test_missing_handler_flagged():
     from easybiz.core.kernel.manifest import parse_manifest
 
     m = parse_manifest(
-        {"id": "hr", "name": "HR", "version": "1.0.0", "events": {"subscribes": ["core.nonexistent.event"]}}
+        {
+            "id": "hr",
+            "name": "HR",
+            "version": "1.0.0",
+            "events": {"subscribes": ["core.nonexistent.event"]},
+        }
     )
     assert checks._missing_handlers(m)  # no handler registered -> non-empty
