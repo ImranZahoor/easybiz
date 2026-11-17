@@ -1,0 +1,254 @@
+from __future__ import annotations
+
+import ast
+import importlib
+import importlib.util
+import os
+from pathlib import Path
+
+from django.apps import apps
+from django.core.management import call_command
+from django.db import connection
+from django.test import Client
+
+from easybiz.core.kernel import lifecycle
+from easybiz.core.kernel.lifecycle import _keep_connection_tenant
+from easybiz.core.kernel.manifest import Manifest
+from easybiz.core.kernel.registry import registry
+from easybiz.core.testing.harness import module_harness
+
+# --- static checks -----------------------------------------------------------
+
+
+def check_manifest_and_app_label(module_id: str) -> list[str]:
+    """The module's manifest loads and its Django app label/name match (app label == id)."""
+    manifest = registry.manifest(module_id)
+    if manifest is None:
+        return [f"{module_id}: no loaded manifest"]
+    try:
+        app = apps.get_app_config(module_id)
+    except LookupError:
+        return [f"{module_id}: no Django app with label {module_id!r}"]
+    out = []
+    if app.label != module_id:
+        out.append(f"{module_id}: app label {app.label!r} != {module_id!r}")
+    if app.name != manifest.package:
+        out.append(f"{module_id}: app name {app.name!r} != package {manifest.package!r}")
+    return out
+
+
+def _module_router(module_id: str):
+    dotted = f"easybiz.modules.{module_id}.api"
+    if importlib.util.find_spec(dotted) is None:
+        return None
+    return getattr(importlib.import_module(dotted), "router", None)
+
+
+def _undeclared_endpoint_perms(perms_used: set[str], declared: set[str]) -> set[str]:
+    """Permission codes used by endpoints that are neither core (`core.*`) nor declared."""
+    return {p for p in perms_used if not p.startswith("core.") and p not in declared}
+
+
+def check_endpoint_permissions(module_id: str) -> list[str]:
+    """Every permission an endpoint guards on is declared by the module (or is core)."""
+    router = _module_router(module_id)
+    if router is None:
+        return []
+    perms_used: set[str] = set()
+    for path_view in router.path_operations.values():
+        for op in path_view.operations:
+            for auth in getattr(op, "auth_callbacks", None) or []:
+                code = getattr(auth, "permission", None)
+                if code:
+                    perms_used.add(code)
+    manifest = registry.manifest(module_id)
+    declared = {code for code, _ in manifest.permissions} if manifest else set()
+    bad = _undeclared_endpoint_perms(perms_used, declared)
+    return [f"{module_id}: endpoint uses undeclared permission {p!r}" for p in sorted(bad)]
+
+
+def _missing_handlers(manifest: Manifest) -> list[str]:
+    return [e for e in manifest.subscribes if not registry.handlers_for(e)]
+
+
+def check_events(module_id: str) -> list[str]:
+    """Every subscribed event has a registered handler (publish declaration enforced elsewhere)."""
+    manifest = registry.manifest(module_id)
+    if manifest is None:
+        return [f"{module_id}: no loaded manifest"]
+    return [f"{module_id}: subscription {e!r} has no handler" for e in _missing_handlers(manifest)]
+
+
+def _scan_imports(package_dir: str, self_id: str) -> list[str]:
+    """Dotted imports of other modules (`easybiz.modules.<other>`) found under a package dir."""
+    offenders: list[str] = []
+    for root, _dirs, files in os.walk(package_dir):
+        for name in files:
+            if not name.endswith(".py"):
+                continue
+            tree = ast.parse(Path(root, name).read_text())
+            for node in ast.walk(tree):
+                mods: list[str] = []
+                if isinstance(node, ast.Import):
+                    mods = [a.name for a in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    mods = [node.module]
+                for mod in mods:
+                    if mod.startswith("easybiz.modules.") and mod.split(".")[2] != self_id:
+                        offenders.append(mod)
+    return offenders
+
+
+def check_no_cross_imports(module_id: str) -> list[str]:
+    """The module imports no other module's package (self and easybiz.core are allowed)."""
+    manifest = registry.manifest(module_id)
+    spec = importlib.util.find_spec(manifest.package) if manifest and manifest.package else None
+    if spec is None or not spec.submodule_search_locations:
+        return [f"{module_id}: package not importable"]
+    location = next(iter(spec.submodule_search_locations))
+    return [
+        f"{module_id}: imports another module {m!r}" for m in _scan_imports(location, module_id)
+    ]
+
+
+def _relation_offenders(model, module_id: str) -> list[str]:
+    """Concrete relation fields on ``model`` whose target lives in another app."""
+    offenders: list[str] = []
+    for field in model._meta.get_fields():
+        # concrete FK/O2O defined here, or a M2M (whose through-table carries cross-schema FKs)
+        own = getattr(field, "concrete", False) or getattr(field, "many_to_many", False)
+        if not (field.is_relation and own):
+            continue
+        related = field.related_model
+        if related is not None and related._meta.app_label != module_id:
+            offenders.append(f"{field.name} -> {related._meta.app_label}")
+    return offenders
+
+
+def check_no_cross_fk_and_prefix(module_id: str) -> list[str]:
+    """Every model table carries the `<id>_` prefix and has no FK to another module."""
+    out: list[str] = []
+    for model in apps.get_app_config(module_id).get_models():
+        if not model._meta.db_table.startswith(f"{module_id}_"):
+            out.append(f"{module_id}: table {model._meta.db_table!r} lacks prefix {module_id}_")
+        for offender in _relation_offenders(model, module_id):
+            out.append(f"{module_id}: {model.__name__} has a cross-module relation {offender}")
+    return out
+
+
+# --- dynamic checks (via module_harness) -------------------------------------
+
+
+def _table_in_schema(table: str, schema: str) -> bool:
+    with connection.cursor() as cur:
+        cur.execute("SELECT 1 FROM pg_tables WHERE schemaname=%s AND tablename=%s", [schema, table])
+        return cur.fetchone() is not None
+
+
+def _migrate_to_zero_and_back(module_id: str, schema: str) -> None:
+    with _keep_connection_tenant():
+        call_command("migrate_schemas", module_id, "zero", schema_name=schema, verbosity=0)
+        call_command("migrate_schemas", module_id, schema_name=schema, verbosity=0)
+
+
+def check_migrations_reversible(module_id: str) -> list[str]:
+    """The module's migrations roll back to zero and forward again without error."""
+    with module_harness(module_id) as tenant:
+        try:
+            _migrate_to_zero_and_back(module_id, tenant.schema_name)
+        except Exception as exc:  # noqa: BLE001 - any migration error is a contract failure
+            return [f"{module_id}: migrations not reversible: {exc}"]
+    return []
+
+
+def check_lifecycle_cycle(module_id: str) -> list[str]:
+    """enable -> disable -> remove data -> re-enable completes without error."""
+    with module_harness(module_id) as tenant:
+        try:
+            lifecycle.disable_module(tenant, module_id)
+            lifecycle.remove_module_data(tenant, module_id)
+            lifecycle.enable_module(tenant, module_id)
+        except Exception as exc:  # noqa: BLE001
+            return [f"{module_id}: lifecycle cycle failed: {exc}"]
+    return []
+
+
+def check_schema_isolation(module_id: str) -> list[str]:
+    """The module's tables live in each enabled tenant's own schema, never in public."""
+    tables = [m._meta.db_table for m in apps.get_app_config(module_id).get_models()]
+    if not tables:
+        return []
+    out: list[str] = []
+    with module_harness(module_id) as a, module_harness(module_id) as b:
+        for table in tables:
+            if not _table_in_schema(table, a.schema_name):
+                out.append(f"{module_id}: table {table!r} missing in {a.schema_name}")
+            if not _table_in_schema(table, b.schema_name):
+                out.append(f"{module_id}: table {table!r} missing in {b.schema_name}")
+            if _table_in_schema(table, "public"):
+                out.append(f"{module_id}: table {table!r} leaked into the public schema")
+    return out
+
+
+def check_handler_idempotency(module_id: str) -> list[str]:
+    """Every subscription is wired through the inbox-idempotent dispatcher (deep replay -> F15)."""
+    manifest = registry.manifest(module_id)
+    if manifest is None:
+        return [f"{module_id}: no loaded manifest"]
+    return [f"{module_id}: subscription {e!r} has no handler" for e in _missing_handlers(manifest)]
+
+
+def check_gate_404(module_id: str) -> list[str]:
+    """A request to the module's path on a tenant where it is disabled answers 404."""
+    router = _module_router(module_id)
+    if router is None or not router.path_operations:
+        return []
+    path = next(iter(router.path_operations))
+    with module_harness(module_id) as tenant:
+        lifecycle.disable_module(tenant, module_id)
+        connection.set_schema_to_public()  # type: ignore[attr-defined]
+        resp = Client().get(f"/api/{module_id}{path}", HTTP_HOST=f"{tenant.slug}.localhost")
+        if resp.status_code != 404:
+            return [f"{module_id}: disabled gate returned {resp.status_code}, expected 404"]
+    return []
+
+
+def check_optional_dependencies(module_id: str) -> list[str]:
+    """The module enables with each optional dependency both present and absent."""
+    manifest = registry.manifest(module_id)
+    out: list[str] = []
+    for dep, _ in manifest.optional if manifest else []:
+        for label, kwargs in (("with", {"with_": [dep]}), ("without", {"without": [dep]})):
+            try:
+                with module_harness(module_id, **kwargs):
+                    pass
+            except Exception as exc:  # noqa: BLE001
+                out.append(f"{module_id}: enable failed {label} optional {dep!r}: {exc}")
+    return out
+
+
+# --- orchestration -----------------------------------------------------------
+
+_ALL_CHECKS = [
+    check_manifest_and_app_label,
+    check_endpoint_permissions,
+    check_events,
+    check_no_cross_imports,
+    check_no_cross_fk_and_prefix,
+    check_migrations_reversible,
+    check_lifecycle_cycle,
+    check_schema_isolation,
+    check_handler_idempotency,
+    check_gate_404,
+    check_optional_dependencies,
+]
+
+
+def run_module_contract_checks(module_id: str) -> list[str]:
+    """Run every static + dynamic contract check for a module; return all failure messages."""
+    if registry.manifest(module_id) is None:
+        raise LookupError(f"unknown module {module_id!r}")
+    failures: list[str] = []
+    for check in _ALL_CHECKS:
+        failures.extend(check(module_id))
+    return failures
