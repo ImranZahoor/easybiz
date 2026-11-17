@@ -7,9 +7,15 @@ import os
 from pathlib import Path
 
 from django.apps import apps
+from django.core.management import call_command
+from django.db import connection
+from django.test import Client
 
+from easybiz.core.kernel import lifecycle
+from easybiz.core.kernel.lifecycle import _keep_connection_tenant
 from easybiz.core.kernel.manifest import Manifest
 from easybiz.core.kernel.registry import registry
+from easybiz.core.testing.harness import module_harness
 
 # --- static checks -----------------------------------------------------------
 
@@ -123,4 +129,97 @@ def check_no_cross_fk_and_prefix(module_id: str) -> list[str]:
             out.append(f"{module_id}: table {model._meta.db_table!r} lacks prefix {module_id}_")
         for offender in _relation_offenders(model, module_id):
             out.append(f"{module_id}: {model.__name__} has a cross-module relation {offender}")
+    return out
+
+
+# --- dynamic checks (via module_harness) -------------------------------------
+
+
+def _table_in_schema(table: str, schema: str) -> bool:
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM pg_tables WHERE schemaname=%s AND tablename=%s", [schema, table]
+        )
+        return cur.fetchone() is not None
+
+
+def _migrate_to_zero_and_back(module_id: str, schema: str) -> None:
+    with _keep_connection_tenant():
+        call_command("migrate_schemas", module_id, "zero", schema_name=schema, verbosity=0)
+        call_command("migrate_schemas", module_id, schema_name=schema, verbosity=0)
+
+
+def check_migrations_reversible(module_id: str) -> list[str]:
+    """The module's migrations roll back to zero and forward again without error."""
+    with module_harness(module_id) as tenant:
+        try:
+            _migrate_to_zero_and_back(module_id, tenant.schema_name)
+        except Exception as exc:  # noqa: BLE001 - any migration error is a contract failure
+            return [f"{module_id}: migrations not reversible: {exc}"]
+    return []
+
+
+def check_lifecycle_cycle(module_id: str) -> list[str]:
+    """enable -> disable -> remove data -> re-enable completes without error."""
+    with module_harness(module_id) as tenant:
+        try:
+            lifecycle.disable_module(tenant, module_id)
+            lifecycle.remove_module_data(tenant, module_id)
+            lifecycle.enable_module(tenant, module_id)
+        except Exception as exc:  # noqa: BLE001
+            return [f"{module_id}: lifecycle cycle failed: {exc}"]
+    return []
+
+
+def check_schema_isolation(module_id: str) -> list[str]:
+    """The module's tables live in each enabled tenant's own schema, never in public."""
+    tables = [m._meta.db_table for m in apps.get_app_config(module_id).get_models()]
+    if not tables:
+        return []
+    out: list[str] = []
+    with module_harness(module_id) as a, module_harness(module_id) as b:
+        for table in tables:
+            if not _table_in_schema(table, a.schema_name):
+                out.append(f"{module_id}: table {table!r} missing in {a.schema_name}")
+            if not _table_in_schema(table, b.schema_name):
+                out.append(f"{module_id}: table {table!r} missing in {b.schema_name}")
+            if _table_in_schema(table, "public"):
+                out.append(f"{module_id}: table {table!r} leaked into the public schema")
+    return out
+
+
+def check_handler_idempotency(module_id: str) -> list[str]:
+    """Every subscription is wired through the inbox-idempotent dispatcher (deep replay -> F15)."""
+    manifest = registry.manifest(module_id)
+    if manifest is None:
+        return [f"{module_id}: no loaded manifest"]
+    return [f"{module_id}: subscription {e!r} has no handler" for e in _missing_handlers(manifest)]
+
+
+def check_gate_404(module_id: str) -> list[str]:
+    """A request to the module's path on a tenant where it is disabled answers 404."""
+    router = _module_router(module_id)
+    if router is None or not router.path_operations:
+        return []
+    path = next(iter(router.path_operations))
+    with module_harness(module_id) as tenant:
+        lifecycle.disable_module(tenant, module_id)
+        connection.set_schema_to_public()  # type: ignore[attr-defined]
+        resp = Client().get(f"/api/{module_id}{path}", HTTP_HOST=f"{tenant.slug}.localhost")
+        if resp.status_code != 404:
+            return [f"{module_id}: disabled gate returned {resp.status_code}, expected 404"]
+    return []
+
+
+def check_optional_dependencies(module_id: str) -> list[str]:
+    """The module enables with each optional dependency both present and absent."""
+    manifest = registry.manifest(module_id)
+    out: list[str] = []
+    for dep, _ in manifest.optional if manifest else []:
+        for label, kwargs in (("with", {"with_": [dep]}), ("without", {"without": [dep]})):
+            try:
+                with module_harness(module_id, **kwargs):
+                    pass
+            except Exception as exc:  # noqa: BLE001
+                out.append(f"{module_id}: enable failed {label} optional {dep!r}: {exc}")
     return out

@@ -35,6 +35,7 @@ def module_harness(
     mods = ({module_id} | _deps_closure(module_id) | set(with_)) - set(without)
     slug = f"ct{module_id.replace('_', '')}{uuid.uuid4().hex[:6]}"
     email = f"owner@{slug}.test"
+    connection.set_schema_to_public()  # type: ignore[attr-defined]  # provisioning needs public
     tenant = provisioning.provision_tenant(
         name=slug,
         slug=slug,
