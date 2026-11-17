@@ -43,6 +43,8 @@ def test_add_to_env_no_line_returns_false(tmp_path):
 
 
 def test_requires_optional_in_manifest(tmp_path):
-    dest = scaffold.scaffold_module("widgets", base_dir=tmp_path, requires=["hr"], optional=["demo"])
+    dest = scaffold.scaffold_module(
+        "widgets", base_dir=tmp_path, requires=["hr"], optional=["demo"]
+    )
     m = parse_manifest(json.loads((dest / "manifest.json").read_text()))
     assert [d for d, _ in m.requires] == ["hr"] and [d for d, _ in m.optional] == ["demo"]

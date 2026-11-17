@@ -6,16 +6,16 @@ from pathlib import Path
 
 from easybiz.core.kernel.manifest import _ID_RE, _RESERVED_IDS
 
-_APPS = '''from django.apps import AppConfig
+_APPS = """from django.apps import AppConfig
 
 
 class __CLASS__Config(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "__PKG__"
     label = "__MID__"
-'''
+"""
 
-_MODELS = '''import uuid
+_MODELS = """import uuid
 
 from django.db import models
 
@@ -24,7 +24,7 @@ class Thing(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
-'''
+"""
 
 _API = '''from ninja import Router, Schema
 
@@ -48,10 +48,10 @@ def list_things(request):
 _HANDLERS = '''"""Event handlers for the __MID__ module (none yet)."""
 '''
 
-_PROVIDERS = '''"""Capability providers and extension contributions for the __MID__ module (none yet)."""
+_PROVIDERS = '''"""Capability providers / extension contributions for __MID__ (none yet)."""
 '''
 
-_MIGRATION = '''import uuid
+_MIGRATION = """import uuid
 
 from django.db import migrations, models
 
@@ -74,19 +74,21 @@ class Migration(migrations.Migration):
             ],
         ),
     ]
-'''
+"""
 
-_TEST = '''from easybiz.core.testing import run_module_contract_checks
+_TEST = """from easybiz.core.testing import run_module_contract_checks
 
 
 def test_module_satisfies_contract():
     assert run_module_contract_checks("__MID__") == []
-'''
+"""
 
 
 def _render(template: str, module_id: str, package: str) -> str:
     cls = "".join(p.title() for p in module_id.split("_"))
-    return template.replace("__CLASS__", cls).replace("__PKG__", package).replace("__MID__", module_id)
+    return (
+        template.replace("__CLASS__", cls).replace("__PKG__", package).replace("__MID__", module_id)
+    )
 
 
 def _manifest(module_id: str, requires: Iterable[str], optional: Iterable[str]) -> dict:
@@ -97,7 +99,9 @@ def _manifest(module_id: str, requires: Iterable[str], optional: Iterable[str]) 
         "manifest_version": 2,
         "requires": [{"module": r} for r in requires],
         "optional": [{"module": o} for o in optional],
-        "permissions": [{"code": f"{module_id}.thing.read", "description": f"View {module_id} things"}],
+        "permissions": [
+            {"code": f"{module_id}.thing.read", "description": f"View {module_id} things"}
+        ],
         "roles": [
             {
                 "name": f"{module_id}_viewer",
@@ -106,7 +110,13 @@ def _manifest(module_id: str, requires: Iterable[str], optional: Iterable[str]) 
             }
         ],
         "events": {"publishes": [], "subscribes": []},
-        "menu": [{"label": module_id.title(), "route": f"/{module_id}", "permission": f"{module_id}.thing.read"}],
+        "menu": [
+            {
+                "label": module_id.title(),
+                "route": f"/{module_id}",
+                "permission": f"{module_id}.thing.read",
+            }
+        ],
     }
 
 
