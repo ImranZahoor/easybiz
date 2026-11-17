@@ -115,7 +115,9 @@ def _relation_offenders(model, module_id: str) -> list[str]:
     """Concrete relation fields on ``model`` whose target lives in another app."""
     offenders: list[str] = []
     for field in model._meta.get_fields():
-        if not (field.is_relation and getattr(field, "concrete", False)):
+        # concrete FK/O2O defined here, or a M2M (whose through-table carries cross-schema FKs)
+        own = getattr(field, "concrete", False) or getattr(field, "many_to_many", False)
+        if not (field.is_relation and own):
             continue
         related = field.related_model
         if related is not None and related._meta.app_label != module_id:

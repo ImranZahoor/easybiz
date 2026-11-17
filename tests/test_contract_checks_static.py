@@ -45,6 +45,18 @@ def test_cross_fk_flagged():
     assert checks._relation_offenders(_CrossFk, module_id="hr")  # FK to iam -> non-empty
 
 
+def test_cross_m2m_flagged():
+    from django.db import models
+
+    class _CrossM2M(models.Model):
+        roles = models.ManyToManyField("iam.Role")
+
+        class Meta:
+            app_label = "hr"
+
+    assert checks._relation_offenders(_CrossM2M, module_id="hr")  # M2M to iam -> non-empty
+
+
 def test_missing_handler_flagged():
     from easybiz.core.kernel.manifest import parse_manifest
 
