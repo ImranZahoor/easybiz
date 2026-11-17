@@ -223,3 +223,30 @@ def check_optional_dependencies(module_id: str) -> list[str]:
             except Exception as exc:  # noqa: BLE001
                 out.append(f"{module_id}: enable failed {label} optional {dep!r}: {exc}")
     return out
+
+
+# --- orchestration -----------------------------------------------------------
+
+_ALL_CHECKS = [
+    check_manifest_and_app_label,
+    check_endpoint_permissions,
+    check_events,
+    check_no_cross_imports,
+    check_no_cross_fk_and_prefix,
+    check_migrations_reversible,
+    check_lifecycle_cycle,
+    check_schema_isolation,
+    check_handler_idempotency,
+    check_gate_404,
+    check_optional_dependencies,
+]
+
+
+def run_module_contract_checks(module_id: str) -> list[str]:
+    """Run every static + dynamic contract check for a module; return all failure messages."""
+    if registry.manifest(module_id) is None:
+        raise LookupError(f"unknown module {module_id!r}")
+    failures: list[str] = []
+    for check in _ALL_CHECKS:
+        failures.extend(check(module_id))
+    return failures
