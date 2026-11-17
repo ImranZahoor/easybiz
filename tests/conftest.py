@@ -64,6 +64,17 @@ def _reset_extensions():
 
 
 @pytest.fixture(autouse=True)
+def _reset_tools():
+    """Isolate the process-global agent-tool registry between tests."""
+    from easybiz.core.tools.registry import registry
+
+    saved = dict(registry._tools)
+    yield
+    registry._tools.clear()
+    registry._tools.update(saved)
+
+
+@pytest.fixture(autouse=True)
 def _reset_cache():
     """Clear the cache each test so the platform-login throttle starts fresh."""
     from django.core.cache import cache
