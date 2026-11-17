@@ -18,7 +18,7 @@ class AuditQuery(Schema):
 
 
 def _tenant():
-    return connection.tenant  # type: ignore[attr-defined]  # set by the request/tenant_context
+    return connection.tenant  # set by the request / tenant_context
 
 
 def _context(user_id, params):
@@ -93,12 +93,60 @@ def _audit(user_id, params):
 
 
 _CORE_TOOLS = [
-    Tool("core.context", "The current tenant and its enabled modules.", ToolTier.READ, None, True, None, _context),
-    Tool("core.modules.list", "Installed modules and their per-tenant status.", ToolTier.READ, "core.module.read", True, None, _modules),
-    Tool("core.roles.list", "Roles in this tenant with their permissions.", ToolTier.READ, "core.role.read", True, None, _roles),
-    Tool("core.permissions.list", "Assignable permissions grouped by module.", ToolTier.READ, "core.role.read", True, None, _permissions),
-    Tool("core.users.list", "Active members of this tenant and their roles.", ToolTier.READ, "core.user.read", True, None, _users),
-    Tool("core.audit.list", "The tenant audit log, newest first.", ToolTier.READ, "core.audit.read", True, AuditQuery, _audit),
+    Tool(
+        "core.context",
+        "The current tenant and its enabled modules.",
+        ToolTier.READ,
+        None,
+        True,
+        None,
+        _context,
+    ),
+    Tool(
+        "core.modules.list",
+        "Installed modules and their per-tenant status.",
+        ToolTier.READ,
+        "core.module.read",
+        True,
+        None,
+        _modules,
+    ),
+    Tool(
+        "core.roles.list",
+        "Roles in this tenant with their permissions.",
+        ToolTier.READ,
+        "core.role.read",
+        True,
+        None,
+        _roles,
+    ),
+    Tool(
+        "core.permissions.list",
+        "Assignable permissions grouped by module.",
+        ToolTier.READ,
+        "core.role.read",
+        True,
+        None,
+        _permissions,
+    ),
+    Tool(
+        "core.users.list",
+        "Active members of this tenant and their roles.",
+        ToolTier.READ,
+        "core.user.read",
+        True,
+        None,
+        _users,
+    ),
+    Tool(
+        "core.audit.list",
+        "The tenant audit log, newest first.",
+        ToolTier.READ,
+        "core.audit.read",
+        True,
+        AuditQuery,
+        _audit,
+    ),
 ]
 
 

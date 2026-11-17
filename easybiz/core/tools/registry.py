@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+
 from easybiz.core.tools.enums import ToolTier
 
 
@@ -15,7 +17,7 @@ class Tool:
     tier: ToolTier
     perm: str | None
     idempotent: bool
-    input_schema: type | None
+    input_schema: type[BaseModel] | None
     handler: Callable[[object, object], object]  # (user_id, validated_params) -> result
 
 
@@ -38,7 +40,9 @@ class ToolRegistry:
 
     def search(self, query: str) -> list[Tool]:
         q = (query or "").lower()
-        return [t for t in self._tools.values() if q in t.name.lower() or q in t.description.lower()]
+        return [
+            t for t in self._tools.values() if q in t.name.lower() or q in t.description.lower()
+        ]
 
 
 registry = ToolRegistry()
