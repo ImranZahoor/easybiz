@@ -227,6 +227,26 @@ def check_optional_dependencies(module_id: str) -> list[str]:
     return out
 
 
+def check_tools(module_id: str) -> list[str]:
+    """Every tool a module contributes is well-formed: name-prefixed, perm declared, valid tier."""
+    from easybiz.core.tools.enums import ToolTier
+    from easybiz.core.tools.registry import registry as tool_registry
+
+    manifest = registry.manifest(module_id)
+    declared = {code for code, _ in manifest.permissions} if manifest else set()
+    out: list[str] = []
+    for tool in tool_registry.all():
+        if tool.module_id != module_id:
+            continue
+        if not tool.name.startswith(f"{module_id}."):
+            out.append(f"{module_id}: tool {tool.name!r} is not prefixed {module_id}.")
+        if tool.perm and not tool.perm.startswith("core.") and tool.perm not in declared:
+            out.append(f"{module_id}: tool {tool.name!r} uses undeclared permission {tool.perm!r}")
+        if not isinstance(tool.tier, ToolTier):
+            out.append(f"{module_id}: tool {tool.name!r} has an invalid tier")
+    return out
+
+
 # --- orchestration -----------------------------------------------------------
 
 _ALL_CHECKS = [
@@ -235,6 +255,7 @@ _ALL_CHECKS = [
     check_events,
     check_no_cross_imports,
     check_no_cross_fk_and_prefix,
+    check_tools,
     check_migrations_reversible,
     check_lifecycle_cycle,
     check_schema_isolation,
