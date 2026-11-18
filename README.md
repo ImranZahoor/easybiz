@@ -6,6 +6,18 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F23a (agent tooling — read-only tool registry + HTTP transport) — complete.** The first slice of
+F23: a transport-agnostic tool layer. `easybiz/core/tools/` holds a `Tool` (name, description, risk
+tier `read`/`write`/`admin`, the same `perm()` code as the matching HTTP endpoint, `idempotent`, input
+schema, handler wrapping an existing query) and a registry; `tools.service.invoke()` enforces the tool's
+`perm()` against the caller's effective iam permissions (the exact HTTP gate — nothing bypasses it),
+refuses non-`read` tools (write/admin need an agent key — F13), pydantic-validates inputs, and audits
+every call. Six core read tools (context, modules, roles, permissions, users, audit) are registered at
+startup. `/api/tools` (tenant-JWT authed) gives lazy discovery — `GET /tools?q=` (compact, perm-filtered
+so unauthorized tools never appear), `GET /tools/{name}` (input schema), `POST /tools/{name}/invoke`.
+The MCP wire protocol, scoped agent keys + write tools, the integrated chatbot, per-module tool
+contributions, and response shaping are later F23 slices (paired with F13/F21).
+
 **F17d (module system v2 — scaffold, uninstall, runbook) — complete. F17 is done.**
 `python manage.py startmodule <id> [--requires ..] [--optional ..] [--path ..]` scaffolds a
 worked-sample, contract-clean module (sample model + templated initial migration, a guarded

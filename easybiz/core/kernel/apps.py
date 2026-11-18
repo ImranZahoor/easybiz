@@ -13,3 +13,7 @@ class KernelConfig(AppConfig):
         registry.ensure_loaded()
         registry.verify_apps()
         registry.import_module_code()
+
+        from easybiz.core.tools import core_tools
+
+        core_tools.register_core_tools()

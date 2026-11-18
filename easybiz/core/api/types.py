@@ -162,3 +162,17 @@ class AttributesIn(Schema):
 
 class AttributesOut(Schema):
     attributes: dict
+
+
+class ToolSummaryOut(Schema):
+    name: str
+    description: str
+    tier: str
+
+
+class ToolDetailOut(Schema):
+    name: str
+    description: str
+    tier: str
+    perm: str | None
+    input_schema: dict | None
