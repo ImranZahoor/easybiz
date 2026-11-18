@@ -1,27 +1,37 @@
 from __future__ import annotations
 
+from django.db import connection
 from pydantic import ValidationError
 
 from easybiz.core.audit import service as audit
 from easybiz.core.errors import DomainError
 from easybiz.core.iam import cache as iam_cache
 from easybiz.core.iam import service as iam
+from easybiz.core.kernel import state
 from easybiz.core.tools.enums import ToolTier
 from easybiz.core.tools.registry import Tool, registry
 
 
 class ToolError(DomainError):
-    """A tool could not be invoked (unknown / forbidden / invalid input)."""
+    """A tool could not be invoked (unknown / unavailable / forbidden / invalid input)."""
 
 
 def _allowed(tool: Tool, perms: set[str]) -> bool:
     return tool.perm is None or iam.has_permission(perms, tool.perm)
 
 
+def _enabled(tool: Tool) -> bool:
+    """A core tool is always available; a module tool only while its module is enabled here."""
+    if tool.module_id is None:
+        return True
+    tenant = getattr(connection, "tenant", None)
+    return tenant is not None and state.is_enabled(tenant, tool.module_id)
+
+
 def accessible(user_id) -> list[Tool]:
-    """Tools the caller is authorized to see/use (perm-filtered)."""
+    """Tools the caller is authorized to see/use (perm-filtered, module-enablement gated)."""
     perms = iam_cache.cached_permissions_for(user_id)
-    return [t for t in registry.all() if _allowed(t, perms)]
+    return [t for t in registry.all() if _enabled(t) and _allowed(t, perms)]
 
 
 def describe(tool: Tool) -> dict:
@@ -40,6 +50,8 @@ def invoke(name: str, raw_inputs: dict, *, user_id) -> object:
     tool = registry.get(name)
     if tool is None:
         raise ToolError(f"unknown tool {name!r}", 404)
+    if not _enabled(tool):
+        raise ToolError(f"tool {name!r} is not available", 404)  # module disabled (gate, not a leak)
     perms = iam_cache.cached_permissions_for(user_id)
     if not _allowed(tool, perms):
         raise ToolError(f"missing permission {tool.perm!r}", 403)

@@ -19,6 +19,7 @@ class Tool:
     idempotent: bool
     input_schema: type[BaseModel] | None
     handler: Callable[[object, object], object]  # (user_id, validated_params) -> result
+    module_id: str | None = None  # None = core; else gated by that module's per-tenant enablement
 
 
 class ToolRegistry:
