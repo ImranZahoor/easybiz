@@ -51,7 +51,8 @@ def invoke(name: str, raw_inputs: dict, *, user_id) -> object:
     if tool is None:
         raise ToolError(f"unknown tool {name!r}", 404)
     if not _enabled(tool):
-        raise ToolError(f"tool {name!r} is not available", 404)  # module disabled (gate, not a leak)
+        # module disabled → 404 like the HTTP module gate (don't leak which tools it has)
+        raise ToolError(f"tool {name!r} is not available", 404)
     perms = iam_cache.cached_permissions_for(user_id)
     if not _allowed(tool, perms):
         raise ToolError(f"missing permission {tool.perm!r}", 403)
