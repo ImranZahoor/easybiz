@@ -28,6 +28,9 @@ def describe_tool(request, name: str):
     tool = registry.get(name)
     if tool is None:
         raise service.ToolError(f"unknown tool {name!r}", 404)
+    if not service._enabled(tool):
+        # disabled module -> clean 404 like invoke (don't leak the tool's existence/perm)
+        raise service.ToolError(f"tool {name!r} is not available", 404)
     if tool not in service.accessible(request.auth.id):
         raise service.ToolError(f"missing permission {tool.perm!r}", 403)
     return ToolDetailOut(**service.describe(tool))
