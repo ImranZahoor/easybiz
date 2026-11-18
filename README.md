@@ -6,6 +6,16 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F23d (agent tooling — per-module tool contributions) — complete.** Modules now contribute their
+own tools to the registry via a `<module>/tools.py` (imported at startup alongside `handlers`/
+`providers`). A `Tool` carries an optional `module_id`; `tools.service` gates a module tool by that
+module's per-tenant enablement — a disabled module's tools are neither listed nor invocable (a clean
+404, checked before the perm gate, so it never leaks which tools a disabled module has). Timesheets
+contributes `timesheets.projects.list` / `timesheets.entries.list` (own-vs-all like its HTTP endpoint).
+The F17 contract kit gains `check_tools` — every module tool must be name-prefixed `<id>.`, use a
+declared (or `core.*`) permission, and carry a valid tier — run by `check_module`/`pytest -m
+module_contract`.
+
 **F23a (agent tooling — read-only tool registry + HTTP transport) — complete.** The first slice of
 F23: a transport-agnostic tool layer. `easybiz/core/tools/` holds a `Tool` (name, description, risk
 tier `read`/`write`/`admin`, the same `perm()` code as the matching HTTP endpoint, `idempotent`, input

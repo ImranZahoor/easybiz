@@ -256,6 +256,7 @@ class Registry:
         for manifest in self._manifests.values():
             self._import_optional(f"{manifest.package}.handlers")
             self._import_optional(f"{manifest.package}.providers")
+            self._import_optional(f"{manifest.package}.tools")
         self._assert_subscriptions_satisfied()
         self._assert_provides_registered()
 

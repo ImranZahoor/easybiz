@@ -55,6 +55,12 @@ def test_invoke_happy(synced, provision):
     assert r.status_code == 200 and "enabled_modules" in r.json()
 
 
+def test_describe_disabled_module_tool_404(synced, provision):
+    token = _owner(provision, "t6")  # provisioned with no modules -> timesheets disabled
+    r = _req("get", "/api/tools/timesheets.projects.list", token, "t6")
+    assert r.status_code == 404  # disabled module -> clean 404, not a 403 leak
+
+
 def test_invoke_malformed_json_422(synced, provision):
     token = _owner(provision, "t5")
     r = _req("post", "/api/tools/core.context/invoke", token, "t5", "not-json")
