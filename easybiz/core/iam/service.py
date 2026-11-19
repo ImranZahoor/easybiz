@@ -524,6 +524,8 @@ def create_api_key(
 ) -> tuple[ApiKey, str]:
     """Issue a key (permissions ⊆ creator's); returns (key, one-time secret)."""
     perms = list(permissions)
+    if "*" in perms:
+        raise ApiKeyError("'*' is reserved; scope a key to explicit permissions")
     try:
         _assert_grantable(perms, creator_perms)
     except RoleError as exc:

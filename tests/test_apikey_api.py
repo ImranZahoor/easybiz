@@ -71,6 +71,12 @@ def test_subset_rule_422(synced, provision):
     assert r.status_code == 422
 
 
+def test_bad_expires_at_422(synced, provision):
+    token = _owner(provision, "ak5")
+    r = _req("post", "/api/core/apikeys", token, "ak5", {"name": "x", "expires_at": "not-a-date"})
+    assert r.status_code == 422
+
+
 def test_revoke(synced, provision):
     token = _owner(provision, "ak4")
     kid = _req("post", "/api/core/apikeys", token, "ak4", {"name": "ci"}).json()["id"]

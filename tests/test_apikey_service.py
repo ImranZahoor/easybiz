@@ -28,6 +28,12 @@ def test_subset_rule_blocks_escalation(synced, db_tenant):
             )
 
 
+def test_rejects_wildcard_perm(synced, db_tenant):
+    with tenant_context(db_tenant):
+        with pytest.raises(iam.ApiKeyError):
+            iam.create_api_key("god", ["*"], creator_id=CREATOR, creator_perms={"*"})
+
+
 def test_revoked_key_does_not_authenticate(synced, db_tenant):
     with tenant_context(db_tenant):
         key, secret = iam.create_api_key("ci", [], creator_id=CREATOR, creator_perms=None)

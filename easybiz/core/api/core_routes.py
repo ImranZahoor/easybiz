@@ -386,7 +386,11 @@ def list_apikeys(request):
 @router.post("/apikeys", auth=perm("core.apikey.manage"), response={201: ApiKeyCreatedOut})
 def create_apikey(request, data: ApiKeyIn):
     """Issue a key; the plaintext secret is returned only here, once."""
-    expires = parse_datetime(data.expires_at) if data.expires_at else None
+    expires = None
+    if data.expires_at:
+        expires = parse_datetime(data.expires_at)
+        if expires is None:
+            raise iam.ApiKeyError("invalid expires_at (use an ISO 8601 datetime)")
     key, secret = iam.create_api_key(
         data.name,
         data.permissions,
