@@ -38,7 +38,10 @@ def test_revoked_key_does_not_authenticate(synced, db_tenant):
 def test_expired_key_does_not_authenticate(synced, db_tenant):
     with tenant_context(db_tenant):
         key, secret = iam.create_api_key(
-            "ci", [], creator_id=CREATOR, creator_perms=None,
+            "ci",
+            [],
+            creator_id=CREATOR,
+            creator_perms=None,
             expires_at=timezone.now() - timedelta(seconds=1),
         )
         assert iam.authenticate_api_key(secret) is None

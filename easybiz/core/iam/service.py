@@ -522,7 +522,7 @@ def _hash_secret(secret: str) -> str:
 def create_api_key(
     name, permissions, *, creator_id, creator_perms, expires_at=None
 ) -> tuple[ApiKey, str]:
-    """Issue a key; its permissions must be a subset of the creator's. Returns (key, one-time secret)."""
+    """Issue a key (permissions ⊆ creator's); returns (key, one-time secret)."""
     perms = list(permissions)
     try:
         _assert_grantable(perms, creator_perms)
@@ -545,7 +545,7 @@ def create_api_key(
 
 
 def authenticate_api_key(raw: str) -> ApiKey | None:
-    """Resolve a ``<prefix>.<secret>`` credential (constant-time), or None if invalid/revoked/expired."""
+    """Resolve a ``<prefix>.<secret>`` credential; None if invalid/revoked/expired."""
     if not raw or "." not in raw:
         return None
     prefix, secret = raw.split(".", 1)

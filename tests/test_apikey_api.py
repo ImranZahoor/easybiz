@@ -47,7 +47,10 @@ def test_requires_apikey_manage(synced, provision):
 def test_create_returns_secret_then_list_hides_it(synced, provision):
     token = _owner(provision, "ak2")
     r = _req(
-        "post", "/api/core/apikeys", token, "ak2",
+        "post",
+        "/api/core/apikeys",
+        token,
+        "ak2",
         {"name": "ci", "permissions": ["core.audit.read"]},
     )
     assert r.status_code == 201 and "." in r.json()["secret"]
@@ -59,7 +62,10 @@ def test_subset_rule_422(synced, provision):
     _owner(provision, "ak3")
     tok = _limited_token(Tenant.objects.get(slug="ak3"), ["core.apikey.manage"])
     r = _req(
-        "post", "/api/core/apikeys", tok, "ak3",
+        "post",
+        "/api/core/apikeys",
+        tok,
+        "ak3",
         {"name": "x", "permissions": ["core.user.manage"]},
     )
     assert r.status_code == 422
