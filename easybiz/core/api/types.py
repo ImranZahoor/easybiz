@@ -164,6 +164,27 @@ class AttributesOut(Schema):
     attributes: dict
 
 
+class ApiKeyIn(Schema):
+    name: str
+    permissions: list[str] = []
+    expires_at: str | None = None
+
+
+class ApiKeyOut(Schema):
+    id: str
+    name: str
+    prefix: str
+    permissions: list[str]
+    created_at: str
+    expires_at: str | None
+    last_used_at: str | None
+    revoked_at: str | None
+
+
+class ApiKeyCreatedOut(ApiKeyOut):
+    secret: str
+
+
 class ToolSummaryOut(Schema):
     name: str
     description: str

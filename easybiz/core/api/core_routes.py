@@ -3,12 +3,16 @@ from __future__ import annotations
 from uuid import UUID
 
 from django.db import transaction
+from django.utils.dateparse import parse_datetime
 from ninja import Router
 from ninja.errors import HttpError
 from ninja.responses import Status
 
 from easybiz.core.api.security import authenticated, perm
 from easybiz.core.api.types import (
+    ApiKeyCreatedOut,
+    ApiKeyIn,
+    ApiKeyOut,
     AttributesIn,
     AttributesOut,
     AuditOut,
@@ -358,6 +362,46 @@ def put_user_attributes(request, user_id: str, data: AttributesIn):
     """Replace a user's full attribute map."""
     attrs = iam.replace_user_attributes(user_id, data.attributes, actor_id=request.auth.id)
     return AttributesOut(attributes=attrs)
+
+
+def _apikey_view(key) -> ApiKeyOut:
+    return ApiKeyOut(
+        id=str(key.id),
+        name=key.name,
+        prefix=key.prefix,
+        permissions=key.permissions,
+        created_at=key.created_at.isoformat(),
+        expires_at=key.expires_at.isoformat() if key.expires_at else None,
+        last_used_at=key.last_used_at.isoformat() if key.last_used_at else None,
+        revoked_at=key.revoked_at.isoformat() if key.revoked_at else None,
+    )
+
+
+@router.get("/apikeys", auth=perm("core.apikey.manage"), response=list[ApiKeyOut])
+def list_apikeys(request):
+    """Every API key for this tenant (never includes a secret)."""
+    return [_apikey_view(k) for k in iam.list_api_keys()]
+
+
+@router.post("/apikeys", auth=perm("core.apikey.manage"), response={201: ApiKeyCreatedOut})
+def create_apikey(request, data: ApiKeyIn):
+    """Issue a key; the plaintext secret is returned only here, once."""
+    expires = parse_datetime(data.expires_at) if data.expires_at else None
+    key, secret = iam.create_api_key(
+        data.name,
+        data.permissions,
+        creator_id=request.auth.id,
+        creator_perms=iam.permissions_for(request.auth.id),
+        expires_at=expires,
+    )
+    return Status(201, ApiKeyCreatedOut(**_apikey_view(key).model_dump(), secret=secret))
+
+
+@router.delete("/apikeys/{key_id}", auth=perm("core.apikey.manage"), response={204: None})
+def revoke_apikey(request, key_id: str):
+    """Revoke an API key (idempotent)."""
+    iam.revoke_api_key(key_id, actor_id=request.auth.id)
+    return Status(204, None)
 
 
 @router.get("/audit", auth=perm("core.audit.read"), response=list[AuditOut])
