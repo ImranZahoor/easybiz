@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
+
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from easybiz.core.audit import service as audit
 from easybiz.core.catalog.models import Permission
@@ -9,7 +14,7 @@ from easybiz.core.errors import DomainError
 from easybiz.core.events import service as events
 from easybiz.core.iam import cache, policy
 from easybiz.core.iam.enums import PolicyEffect
-from easybiz.core.iam.models import Policy, Role, RolePermission, UserAttribute, UserRole
+from easybiz.core.iam.models import ApiKey, Policy, Role, RolePermission, UserAttribute, UserRole
 from easybiz.core.kernel import state
 from easybiz.core.kernel.registry import registry
 
@@ -498,3 +503,77 @@ def remove_user_role(user_id, role_name, *, actor_id=None) -> None:
         raise DomainError("cannot remove the last owner", 409)
     UserRole.objects.filter(user_id=user_id, role=role).delete()
     _announce_user(actor_id, "user.role_removed", user_id)
+
+
+# --- API keys (F13 item 6): tenant service credentials ----------------------
+
+
+class ApiKeyError(DomainError):
+    """An invalid API-key operation (maps to HTTP 422)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, 422)
+
+
+def _hash_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+def create_api_key(
+    name, permissions, *, creator_id, creator_perms, expires_at=None
+) -> tuple[ApiKey, str]:
+    """Issue a key (permissions ⊆ creator's); returns (key, one-time secret)."""
+    perms = list(permissions)
+    if "*" in perms:
+        raise ApiKeyError("'*' is reserved; scope a key to explicit permissions")
+    try:
+        _assert_grantable(perms, creator_perms)
+    except RoleError as exc:
+        raise ApiKeyError(str(exc)) from exc
+    prefix = secrets.token_hex(8)
+    while ApiKey.objects.filter(prefix=prefix).exists():  # rare collision
+        prefix = secrets.token_hex(8)
+    secret = secrets.token_urlsafe(32)
+    key = ApiKey.objects.create(
+        name=name,
+        prefix=prefix,
+        secret_hash=_hash_secret(secret),
+        permissions=perms,
+        created_by=creator_id,
+        expires_at=expires_at,
+    )
+    audit.record(creator_id, "apikey.created", entity="apikey", entity_id=str(key.id))
+    return key, f"{prefix}.{secret}"
+
+
+def authenticate_api_key(raw: str) -> ApiKey | None:
+    """Resolve a ``<prefix>.<secret>`` credential; None if invalid/revoked/expired."""
+    if not raw or "." not in raw:
+        return None
+    prefix, secret = raw.split(".", 1)
+    key = ApiKey.objects.filter(prefix=prefix).first()
+    if key is None:
+        return None
+    if not hmac.compare_digest(key.secret_hash, _hash_secret(secret)):
+        return None
+    if key.revoked_at is not None:
+        return None
+    if key.expires_at is not None and key.expires_at <= timezone.now():
+        return None
+    key.last_used_at = timezone.now()
+    key.save(update_fields=["last_used_at"])
+    return key
+
+
+def list_api_keys() -> list[ApiKey]:
+    return list(ApiKey.objects.order_by("-created_at"))
+
+
+def revoke_api_key(key_id, *, actor_id) -> None:
+    key = ApiKey.objects.filter(id=key_id).first()
+    if key is None:
+        raise DomainError("api key not found", 404)
+    if key.revoked_at is None:
+        key.revoked_at = timezone.now()
+        key.save(update_fields=["revoked_at"])
+    audit.record(actor_id, "apikey.revoked", entity="apikey", entity_id=str(key_id))

@@ -6,6 +6,16 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F13 (API keys) — complete.** The first auth-hardening slice: tenant service credentials.
+`iam_apikey` stores a public `prefix` + the SHA-256 `secret_hash` (never the secret); `create_api_key`
+issues `<prefix>.<secret>` **once**, enforcing that the key's permissions are a **subset of the
+creator's** (no escalation); `authenticate_api_key` resolves a credential in constant time
+(`hmac.compare_digest`), rejecting revoked/expired keys and stamping `last_used_at`. `/api/core/apikeys`
+(under a new `core.apikey.manage`) issues (returns the one-time secret), lists (never the secret), and
+revokes. Applying keys as a transport auth (on-behalf-of user, tool allowlist, read/write scope, per-key
+rate limit) + the MCP wire server is F23b; the rest of F13 (refresh, reset, invitations, MFA, SSO,
+signing keys, brute-force, password policy) are separate slices (some blocked on F9/F5).
+
 **F23d (agent tooling — per-module tool contributions) — complete.** Modules now contribute their
 own tools to the registry via a `<module>/tools.py` (imported at startup alongside `handlers`/
 `providers`). A `Tool` carries an optional `module_id`; `tools.service` gates a module tool by that

@@ -58,3 +58,18 @@ class UserAttribute(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["user_id", "key"], name="uniq_user_attribute")
         ]
+
+
+class ApiKey(models.Model):
+    """A tenant service credential: public prefix + hashed secret, scoped permissions (F13)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    prefix = models.CharField(max_length=16, unique=True, db_index=True)
+    secret_hash = models.CharField(max_length=64)  # SHA-256 hex of the one-time secret
+    permissions = models.JSONField(default=list)
+    created_by = models.UUIDField()  # issuing user, by value (I2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
