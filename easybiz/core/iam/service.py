@@ -520,13 +520,23 @@ def _hash_secret(secret: str) -> str:
 
 
 def create_api_key(
-    name, permissions, *, creator_id, creator_perms, expires_at=None
+    tenant,
+    name,
+    permissions,
+    *,
+    creator_id,
+    creator_perms,
+    expires_at=None,
+    on_behalf_of_user=None,
+    tool_allowlist=(),
+    scope="read",
 ) -> tuple[ApiKey, str]:
-    """Issue a key (permissions ⊆ creator's); returns (key, one-time secret)."""
+    """Issue a key (permissions real/enabled and ⊆ creator's); returns (key, one-time secret)."""
     perms = list(permissions)
-    if "*" in perms:
-        raise ApiKeyError("'*' is reserved; scope a key to explicit permissions")
+    if scope not in ("read", "write"):
+        raise ApiKeyError(f"scope must be 'read' or 'write', not {scope!r}")
     try:
+        _assert_assignable(tenant, perms)  # reject '*'/unknown/disabled (F13 deferral)
         _assert_grantable(perms, creator_perms)
     except RoleError as exc:
         raise ApiKeyError(str(exc)) from exc
@@ -541,6 +551,9 @@ def create_api_key(
         permissions=perms,
         created_by=creator_id,
         expires_at=expires_at,
+        on_behalf_of_user=on_behalf_of_user,
+        tool_allowlist=list(tool_allowlist),
+        scope=scope,
     )
     audit.record(creator_id, "apikey.created", entity="apikey", entity_id=str(key.id))
     return key, f"{prefix}.{secret}"

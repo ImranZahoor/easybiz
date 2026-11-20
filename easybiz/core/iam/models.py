@@ -73,3 +73,7 @@ class ApiKey(models.Model):
     expires_at = models.DateTimeField(null=True, blank=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
+    # --- agent-key scoping (F23b): set when a key drives the tool layer on behalf of a user
+    on_behalf_of_user = models.UUIDField(null=True, blank=True)  # by value (I2)
+    tool_allowlist = models.JSONField(default=list)  # deny-all: only these tool names
+    scope = models.CharField(max_length=5, default="read")  # "read" | "write"

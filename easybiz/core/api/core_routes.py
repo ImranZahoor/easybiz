@@ -374,6 +374,9 @@ def _apikey_view(key) -> ApiKeyOut:
         expires_at=key.expires_at.isoformat() if key.expires_at else None,
         last_used_at=key.last_used_at.isoformat() if key.last_used_at else None,
         revoked_at=key.revoked_at.isoformat() if key.revoked_at else None,
+        on_behalf_of_user=str(key.on_behalf_of_user) if key.on_behalf_of_user else None,
+        tool_allowlist=key.tool_allowlist,
+        scope=key.scope,
     )
 
 
@@ -392,11 +395,15 @@ def create_apikey(request, data: ApiKeyIn):
         if expires is None:
             raise iam.ApiKeyError("invalid expires_at (use an ISO 8601 datetime)")
     key, secret = iam.create_api_key(
+        request.tenant,
         data.name,
         data.permissions,
         creator_id=request.auth.id,
         creator_perms=iam.permissions_for(request.auth.id),
         expires_at=expires,
+        on_behalf_of_user=data.on_behalf_of_user,
+        tool_allowlist=data.tool_allowlist,
+        scope=data.scope,
     )
     return Status(201, ApiKeyCreatedOut(**_apikey_view(key).model_dump(), secret=secret))
 

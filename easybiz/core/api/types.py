@@ -168,6 +168,9 @@ class ApiKeyIn(Schema):
     name: str
     permissions: list[str] = []
     expires_at: str | None = None
+    on_behalf_of_user: str | None = None
+    tool_allowlist: list[str] = []
+    scope: str = "read"
 
 
 class ApiKeyOut(Schema):
@@ -179,6 +182,9 @@ class ApiKeyOut(Schema):
     expires_at: str | None
     last_used_at: str | None
     revoked_at: str | None
+    on_behalf_of_user: str | None
+    tool_allowlist: list[str]
+    scope: str
 
 
 class ApiKeyCreatedOut(ApiKeyOut):
