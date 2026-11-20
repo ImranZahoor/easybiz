@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
 from django.db import connection
 from pydantic import ValidationError
@@ -22,11 +23,11 @@ class ToolError(DomainError):
 class Principal:
     """Who is invoking a tool: a user (chatbot/JWT) or an agent key acting on behalf of one."""
 
-    subject_user_id: object  # the user whose RBAC+ABAC authority is used
+    subject_user_id: UUID  # the user whose RBAC+ABAC authority is used
     scope: str  # "read" | "write"
     allowlist: set[str] | None  # None = all tools; set = only these (agent key)
-    actor_id: object  # audit actor (the user, or the agent key id)
-    on_behalf_of: object | None  # the user an agent key acts for (else None)
+    actor_id: UUID  # audit actor (the user, or the agent key id)
+    on_behalf_of: UUID | None  # the user an agent key acts for (else None)
     key_perms: set[str] | None  # an agent key's permission subset (None = user, no key cap)
 
     @classmethod
@@ -73,7 +74,7 @@ def _tier_ok(tool: Tool, principal: Principal) -> bool:
 
 
 def _visible(tool: Tool, principal: Principal, perms: set[str]) -> bool:
-    """Discovery filter: enabled, in allowlist, tier≤scope, key-subset, and the user holds the perm."""
+    """Discovery filter: enabled + allowlist + tier≤scope + key-subset + user holds the perm."""
     if not _enabled(tool):
         return False
     if principal.allowlist is not None and tool.name not in principal.allowlist:

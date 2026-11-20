@@ -29,7 +29,9 @@ def describe_tool(request, name: str):
     if tool is None:
         raise service.ToolError(f"unknown tool {name!r}", 404)
     if not service._enabled(tool):
-        raise service.ToolError(f"tool {name!r} is not available", 404)  # disabled module → gate 404
+        raise service.ToolError(
+            f"tool {name!r} is not available", 404
+        )  # disabled module → gate 404
     if tool not in service.accessible_for(request.auth):
         raise service.ToolError(f"missing permission {tool.perm!r}", 403)
     return ToolDetailOut(**service.describe(tool))
