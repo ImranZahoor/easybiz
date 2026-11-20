@@ -6,6 +6,18 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F23b (agent tooling — scoped agent keys + write tools) — complete.** An external agent drives the
+tool layer through a **scoped agent key**: F13's `ApiKey` gains `on_behalf_of_user`, a `tool_allowlist`,
+and a `read`/`write` `scope`. Tool invocation generalizes to a `Principal` (a user, from the JWT/chatbot
+path, or an agent key, from an `Authorization: ApiKey …` transport). The gate: tool ∈ allowlist (deny-all)
+→ module enabled (404) → tier ≤ scope (write tools need `write`; `admin` hard-excluded from agents) → the
+key's permission subset → the on-behalf user's **`authorize()` (RBAC+ABAC)** → validated inputs → audit
+(`actor = key on behalf of user`). Effective authority is the **intersection** of the key's subset and the
+user's *current* permissions, so revoking either shrinks the agent instantly. Keys are validated at
+creation (`_assert_assignable`; no `*`/unknown/disabled). A `write` tool (`timesheets.projects.create`)
+proves the write path. Per-key rate limiting and the MCP stdio/streamable-HTTP wire server remain later
+efforts; `admin`-tier elevation + human confirmation too.
+
 **F13 (API keys) — complete.** The first auth-hardening slice: tenant service credentials.
 `iam_apikey` stores a public `prefix` + the SHA-256 `secret_hash` (never the secret); `create_api_key`
 issues `<prefix>.<secret>` **once**, enforcing that the key's permissions are a **subset of the
