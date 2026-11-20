@@ -83,7 +83,9 @@ def test_agent_invokes_when_both_grant_and_audits(synced, db_tenant):
         _user_with(["core.audit.read"])
         _reg("core.read")
         assert service._invoke("core.read", {}, _agent())["ok"] == "core.read"
-        assert AuditLog.objects.filter(action="tool.invoked", entity_id="core.read").exists()
+        row = AuditLog.objects.get(action="tool.invoked", entity_id="core.read")
+        assert str(row.actor_id) == "99999999-9999-9999-9999-999999999999"  # the key is the actor
+        assert row.after == {"on_behalf_of": USER}  # the user it acts for
 
 
 def test_abac_deny_blocks_agent(synced, db_tenant):
