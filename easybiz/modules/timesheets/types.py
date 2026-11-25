@@ -74,6 +74,14 @@ class RejectIn(Schema):
     reason: str = ""
 
 
+class OverviewIn(Schema):
+    """Composite-overview request: a date window plus how many recent entries to echo."""
+
+    start: date
+    end: date
+    recent: int = 5
+
+
 class EntryOut(Schema):
     id: str
     user_id: str

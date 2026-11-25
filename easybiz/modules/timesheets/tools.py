@@ -4,7 +4,13 @@ from easybiz.core.tools.enums import ToolTier
 from easybiz.core.tools.paging_io import PageIn, project
 from easybiz.core.tools.registry import Tool, registry
 from easybiz.modules.timesheets import commands, queries
-from easybiz.modules.timesheets.types import CreateProjectParams, EntryOut, ProjectIn, ProjectOut
+from easybiz.modules.timesheets.types import (
+    CreateProjectParams,
+    EntryOut,
+    OverviewIn,
+    ProjectIn,
+    ProjectOut,
+)
 
 
 def _projects(user_id, params):
@@ -25,6 +31,20 @@ def _entries(user_id, params):
     )
     items = [EntryOut.of(e).model_dump() for e in page["items"]]
     return {"items": project(items, params.fields), "next_cursor": page["next_cursor"]}
+
+
+def _overview(user_id, params):
+    can_all = iam.has_permission(iam.permissions_for(user_id), "timesheets.entry.approve")
+    limit = max(1, min(params.recent, 50))
+    recent = queries.entries_queryset(user_id, can_all).order_by("-work_date")[:limit]
+    return {
+        "projects": queries.projects_queryset().count(),
+        "approved_hours": str(queries.approved_hours(user_id, params.start, params.end)),
+        "recent_entries": [
+            {"work_date": e.work_date.isoformat(), "hours": str(e.hours), "status": e.status}
+            for e in recent
+        ],
+    }
 
 
 def _create_project(user_id, params):
@@ -51,6 +71,16 @@ _TOOLS = [
         idempotent=True,
         input_schema=PageIn,
         handler=_entries,
+        module_id="timesheets",
+    ),
+    Tool(
+        name="timesheets.overview",
+        description="Pre-aggregated dashboard: project count, approved hours, recent entries.",
+        tier=ToolTier.READ,
+        perm="timesheets.entry.read",
+        idempotent=True,
+        input_schema=OverviewIn,
+        handler=_overview,
         module_id="timesheets",
     ),
     Tool(

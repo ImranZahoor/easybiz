@@ -6,6 +6,16 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F23e (agent tooling — response shaping + a composite tool) — complete.** Two more ways to bound an
+agent's token cost. A `fields` list on `PageIn` projects each list-tool item to just the requested keys
+(`paging_io.project`, lenient — unknown keys absent, `None` returns the full item), applied by
+`core.audit.list`, `timesheets.projects.list`, and `timesheets.entries.list`. A pre-aggregated read
+composite, `timesheets.overview(start, end, recent)`, returns `{projects, approved_hours,
+recent_entries}` in one server-side call — the model neither pages nor sums — composing the existing
+`projects_queryset`/`approved_hours`/`entries_queryset` reads and gated like any module tool. Token
+bounding for the agent surface is now complete; the MCP wire server, the F23c chatbot (Anthropic SDK),
+`admin`-tier elevation, and per-key rate limiting remain.
+
 **F21 (API conventions — cursor pagination, first slice) — complete.** `easybiz/core/api/paging.py`
 provides a reusable keyset paginator — `paginate(queryset, *, limit, cursor, order_by)` over
 `(order_by field, pk)` with an opaque base64 cursor, `limit` capped at 200, and a 422 on a malformed
