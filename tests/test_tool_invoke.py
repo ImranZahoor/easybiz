@@ -50,13 +50,13 @@ def test_missing_permission_403(synced, db_tenant):
         assert e.value.status == 403
 
 
-def test_write_tool_refused(synced, db_tenant):
+def test_user_can_invoke_write_tool(synced, db_tenant):
+    # F23b: a user principal has write scope, so a write tool is invocable (gated by its perm);
+    # read-scope *agent keys* are refused write tools — see tests/test_tool_principal.py.
     with tenant_context(db_tenant):
         _register(name="t.write", tier=ToolTier.WRITE, perm=None)
         uid = _reader([])
-        with pytest.raises(service.ToolError) as e:
-            service.invoke("t.write", {}, user_id=uid)
-        assert e.value.status == 403
+        assert service.invoke("t.write", {}, user_id=uid) == {"ok": True}
 
 
 def test_invalid_input_422(synced, db_tenant):
