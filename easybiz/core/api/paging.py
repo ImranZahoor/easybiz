@@ -4,6 +4,7 @@ import base64
 import json
 from datetime import date
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
 
 from easybiz.core.errors import DomainError
@@ -43,8 +44,14 @@ def paginate(
     if cursor:
         value, pk = _decode(cursor)
         op = "lt" if desc else "gt"
-        qs = qs.filter(Q(**{f"{field}__{op}": value}) | Q(**{field: value, f"pk__{op}": pk}))
-    rows = list(qs[: limit + 1])
+        try:
+            # a bad/cross-tool cursor value raises here (filter build or query exec) → clean 422
+            qs = qs.filter(Q(**{f"{field}__{op}": value}) | Q(**{field: value, f"pk__{op}": pk}))
+            rows = list(qs[: limit + 1])
+        except (DjangoValidationError, ValueError, TypeError) as exc:
+            raise CursorError() from exc
+    else:
+        rows = list(qs[: limit + 1])
     if len(rows) > limit:
         last = rows[limit - 1]
         return {"items": rows[:limit], "next_cursor": _encode(getattr(last, field), last.pk)}

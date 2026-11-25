@@ -43,6 +43,14 @@ def test_malformed_cursor_rejected(synced, db_tenant):
             paging.paginate(AuditLog.objects.all(), cursor="not-base64!!", order_by="-at")
 
 
+def test_cursor_with_wrong_field_value_rejected(synced, db_tenant):
+    # a well-formed cursor carrying a value invalid for the field (e.g. replayed across tools)
+    with tenant_context(db_tenant):
+        bad = paging._encode("not-a-date", "11111111-1111-1111-1111-111111111111")
+        with pytest.raises(paging.CursorError):
+            paging.paginate(AuditLog.objects.all(), cursor=bad, order_by="-at")
+
+
 def test_tie_on_sort_value_paged_by_pk(synced, db_tenant):
     with tenant_context(db_tenant):
         for i in range(4):
