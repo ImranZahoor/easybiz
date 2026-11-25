@@ -34,6 +34,9 @@ def _entries(user_id, params):
 
 
 def _overview(user_id, params):
+    # Scopes intentionally differ: `projects` is tenant-wide, `approved_hours` is always the
+    # caller's own, and `recent_entries` follows the entries.list rule (own for a reader, all
+    # for an approver). A personal-hours total beside a team-wide recent feed is deliberate.
     can_all = iam.has_permission(iam.permissions_for(user_id), "timesheets.entry.approve")
     limit = max(1, min(params.recent, 50))
     recent = queries.entries_queryset(user_id, can_all).order_by("-work_date")[:limit]
