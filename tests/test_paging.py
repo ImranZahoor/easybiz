@@ -49,7 +49,9 @@ def test_tie_on_sort_value_paged_by_pk(synced, db_tenant):
             AuditLog.objects.create(action="same", entity="x", entity_id=str(i))
         seen, cursor = [], None
         while True:
-            page = paging.paginate(AuditLog.objects.all(), limit=1, cursor=cursor, order_by="action")
+            page = paging.paginate(
+                AuditLog.objects.all(), limit=1, cursor=cursor, order_by="action"
+            )
             seen += [r.entity_id for r in page["items"]]
             cursor = page["next_cursor"]
             if cursor is None:

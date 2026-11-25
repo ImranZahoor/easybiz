@@ -31,7 +31,9 @@ def _decode(cursor: str) -> tuple[str, str]:
         raise CursorError() from exc
 
 
-def paginate(queryset, *, limit: int = 50, cursor: str | None = None, order_by: str = "-id") -> dict:
+def paginate(
+    queryset, *, limit: int = 50, cursor: str | None = None, order_by: str = "-id"
+) -> dict:
     """Keyset-paginate a queryset over (order_by field, pk). Returns {items, next_cursor}."""
     limit = max(1, min(limit, MAX_LIMIT))
     field = order_by.lstrip("-")

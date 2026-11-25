@@ -153,8 +153,14 @@ def test_deactivated_on_behalf_user_denied(synced, provision):
 
     owner = _owner(provision, "ag7")
     uid = _make_user(Tenant.objects.get(slug="ag7"), ["core.audit.read"], "u@ag7.test")
-    raw = _mint(owner, "ag7", permissions=["core.audit.read"], on_behalf=uid,
-                allowlist=["core.audit.list"], scope="read")
+    raw = _mint(
+        owner,
+        "ag7",
+        permissions=["core.audit.read"],
+        on_behalf=uid,
+        allowlist=["core.audit.list"],
+        scope="read",
+    )
     User.objects.filter(id=uid).update(is_active=False)  # suspend the on-behalf user
     assert _ak("post", "/api/tools/core.audit.list/invoke", raw, "ag7", {}).status_code == 401
 

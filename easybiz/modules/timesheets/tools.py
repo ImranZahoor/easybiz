@@ -11,8 +11,10 @@ def _projects(user_id, params):
     page = paging.paginate(
         queries.projects_queryset(), limit=params.limit, cursor=params.cursor, order_by="code"
     )
-    return {"items": [ProjectOut.of(p).model_dump() for p in page["items"]],
-            "next_cursor": page["next_cursor"]}
+    return {
+        "items": [ProjectOut.of(p).model_dump() for p in page["items"]],
+        "next_cursor": page["next_cursor"],
+    }
 
 
 def _entries(user_id, params):
@@ -23,8 +25,10 @@ def _entries(user_id, params):
         cursor=params.cursor,
         order_by="-work_date",
     )
-    return {"items": [EntryOut.of(e).model_dump() for e in page["items"]],
-            "next_cursor": page["next_cursor"]}
+    return {
+        "items": [EntryOut.of(e).model_dump() for e in page["items"]],
+        "next_cursor": page["next_cursor"],
+    }
 
 
 def _create_project(user_id, params):
