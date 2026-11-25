@@ -19,7 +19,8 @@ def test_projects_tool_runs_when_enabled(synced, db_tenant):
         RolePermission.objects.create(role=role, permission="timesheets.project.read")
         uid = "33333333-3333-3333-3333-333333333333"
         UserRole.objects.create(user_id=uid, role=role)
-        assert isinstance(service.invoke("timesheets.projects.list", {}, user_id=uid), list)
+        out = service.invoke("timesheets.projects.list", {}, user_id=uid)
+        assert set(out) == {"items", "next_cursor"} and isinstance(out["items"], list)
 
 
 def test_timesheets_tool_gated_when_disabled(synced, db_tenant):

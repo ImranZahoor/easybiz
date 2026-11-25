@@ -41,4 +41,4 @@ def test_audit_tool_requires_permission(synced, db_tenant):
         uid = "44444444-4444-4444-4444-444444444444"
         UserRole.objects.create(user_id=uid, role=role)
         out = service.invoke("core.audit.list", {"limit": 5}, user_id=uid)
-        assert isinstance(out, list)
+        assert set(out) == {"items", "next_cursor"} and isinstance(out["items"], list)

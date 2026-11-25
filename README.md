@@ -6,6 +6,15 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F21 (API conventions — cursor pagination, first slice) — complete.** `easybiz/core/api/paging.py`
+provides a reusable keyset paginator — `paginate(queryset, *, limit, cursor, order_by)` over
+`(order_by field, pk)` with an opaque base64 cursor, `limit` capped at 200, and a 422 on a malformed
+cursor — stable under inserts and shared by core and modules. The agent list tools (`core.audit.list`,
+`timesheets.projects.list`, `timesheets.entries.list`) now take `limit`/`cursor` and return
+`{"items": [...], "next_cursor": ...}`, bounding an agent's output tokens (F23e). The error envelope,
+`Idempotency-Key`, optimistic concurrency, OpenAPI hygiene, and the `/api/v1` namespace that brings
+pagination to the HTTP list endpoints are later F21 slices; async (202) waits on F11.
+
 **F23b (agent tooling — scoped agent keys + write tools) — complete.** An external agent drives the
 tool layer through a **scoped agent key**: F13's `ApiKey` gains `on_behalf_of_user`, a `tool_allowlist`,
 and a `read`/`write` `scope`. Tool invocation generalizes to a `Principal` (a user, from the JWT/chatbot

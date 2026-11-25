@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 from django.db import connection
-from ninja import Schema
 
+from easybiz.core.api import paging
 from easybiz.core.audit.models import AuditLog
 from easybiz.core.catalog.models import TenantModule
 from easybiz.core.iam import service as iam
 from easybiz.core.kernel import state
 from easybiz.core.kernel.registry import registry as module_registry
 from easybiz.core.tools.enums import ToolTier
+from easybiz.core.tools.paging_io import PageIn
 from easybiz.core.tools.registry import Tool, registry
 from easybiz.core.users.models import Membership
-
-
-class AuditQuery(Schema):
-    limit: int = 50
 
 
 def _tenant():
@@ -78,9 +75,10 @@ def _users(user_id, params):
 
 
 def _audit(user_id, params):
-    limit = max(0, min(params.limit, 200))
-    rows = AuditLog.objects.order_by("-at")[:limit]
-    return [
+    page = paging.paginate(
+        AuditLog.objects.all(), limit=params.limit, cursor=params.cursor, order_by="-at"
+    )
+    items = [
         {
             "at": r.at.isoformat(),
             "actor_id": str(r.actor_id) if r.actor_id else None,
@@ -88,8 +86,9 @@ def _audit(user_id, params):
             "entity": r.entity,
             "entity_id": r.entity_id,
         }
-        for r in rows
+        for r in page["items"]
     ]
+    return {"items": items, "next_cursor": page["next_cursor"]}
 
 
 _CORE_TOOLS = [
@@ -144,7 +143,7 @@ _CORE_TOOLS = [
         ToolTier.READ,
         "core.audit.read",
         True,
-        AuditQuery,
+        PageIn,
         _audit,
     ),
 ]

@@ -11,13 +11,17 @@ from easybiz.modules.timesheets.types import EntryOut, ProjectOut
 # --- public reads (return DTOs; nothing ORM-shaped reaches the handler) ------
 
 
+def projects_queryset():
+    return Project.objects.all()
+
+
 def all_projects() -> list[ProjectOut]:
-    return [ProjectOut.of(p) for p in Project.objects.order_by("code")]
+    return [ProjectOut.of(p) for p in projects_queryset().order_by("code")]
 
 
-def entries_for(
+def entries_queryset(
     viewer_id: UUID, can_view_all: bool, status: str | None = None, user_id: UUID | None = None
-) -> list[EntryOut]:
+):
     """A reader sees only their own entries; an approver sees all, optionally filtered by user."""
     entries = Entry.objects.all()
     if can_view_all:
@@ -27,7 +31,14 @@ def entries_for(
         entries = entries.filter(user_id=viewer_id)
     if status:
         entries = entries.filter(status=status)
-    return [EntryOut.of(e) for e in entries.order_by("-work_date")]
+    return entries
+
+
+def entries_for(
+    viewer_id: UUID, can_view_all: bool, status: str | None = None, user_id: UUID | None = None
+) -> list[EntryOut]:
+    qs = entries_queryset(viewer_id, can_view_all, status, user_id)
+    return [EntryOut.of(e) for e in qs.order_by("-work_date")]
 
 
 def approved_hours(user_id: UUID, start: date, end: date) -> Decimal:
