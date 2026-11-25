@@ -9,7 +9,7 @@ from easybiz.core.iam import service as iam
 from easybiz.core.kernel import state
 from easybiz.core.kernel.registry import registry as module_registry
 from easybiz.core.tools.enums import ToolTier
-from easybiz.core.tools.paging_io import PageIn
+from easybiz.core.tools.paging_io import PageIn, project
 from easybiz.core.tools.registry import Tool, registry
 from easybiz.core.users.models import Membership
 
@@ -88,7 +88,7 @@ def _audit(user_id, params):
         }
         for r in page["items"]
     ]
-    return {"items": items, "next_cursor": page["next_cursor"]}
+    return {"items": project(items, params.fields), "next_cursor": page["next_cursor"]}
 
 
 _CORE_TOOLS = [
