@@ -81,6 +81,8 @@ def handle_message(message, principal) -> dict | None:
         return _result(id_, {"tools": tools})
     if method == "tools/call":
         params = message.get("params") or {}
+        if not isinstance(params, dict):
+            return _error(id_, _INVALID_PARAMS, "params must be an object")
         name = params.get("name")
         if not isinstance(name, str) or not name:
             return _error(id_, _INVALID_PARAMS, "missing tool name")

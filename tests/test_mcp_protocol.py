@@ -95,3 +95,27 @@ def test_tools_call_missing_name_is_invalid_params():
         {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {}}, Principal.from_user("0")
     )
     assert out["error"]["code"] == -32602  # invalid params
+
+
+def test_tools_call_non_dict_params_is_invalid_params():
+    # positional-array params are legal JSON-RPC 2.0 but unusable here → a clean error, not a crash
+    out = protocol.handle_message(
+        {"jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": [1, 2, 3]},
+        Principal.from_user("0"),
+    )
+    assert out["error"]["code"] == -32602 and "error" in out
+
+
+def test_tools_call_unknown_tool_is_iserror(synced, db_tenant):
+    with tenant_context(db_tenant):
+        uid = _user("core.audit.read")
+        out = protocol.handle_message(
+            {
+                "jsonrpc": "2.0",
+                "id": 9,
+                "method": "tools/call",
+                "params": {"name": "core.does.not.exist", "arguments": {}},
+            },
+            Principal.from_user(uid),
+        )
+        assert "error" not in out and out["result"]["isError"] is True

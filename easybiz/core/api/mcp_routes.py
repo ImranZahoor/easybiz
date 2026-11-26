@@ -21,7 +21,8 @@ def rpc(request):
     """
     try:
         message = json.loads(request.body or b"{}")
-    except json.JSONDecodeError:
+    except (ValueError, RecursionError):
+        # JSONDecodeError (a ValueError) for bad JSON; RecursionError for pathologically deep input
         return {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}}
     response = protocol.handle_message(message, request.auth)
     if response is None:
