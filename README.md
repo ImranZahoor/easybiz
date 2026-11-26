@@ -6,6 +6,18 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F23f (agent tooling — MCP wire server, streamable-HTTP) — complete.** The tool layer is now reachable
+over the Model Context Protocol at `POST /api/mcp` — a hand-rolled JSON-RPC 2.0 endpoint (no new deps)
+supporting `initialize`, `ping`, `tools/list`, and `tools/call`. A transport-free dispatch core
+(`easybiz/core/mcp/protocol.py`) turns one message + a `Principal` into one response; the thin
+django-ninja route (`easybiz/core/api/mcp_routes.py`) reuses `ToolPrincipalAuth` (JWT or scoped agent
+key → `Principal`) and `TenantMainMiddleware`, so the handshake is authenticated and tenant isolation,
+the full F23b gate (allowlist → tier/scope → key-subset → `authorize`), and the audit entry are all
+inherited unchanged — `tools/call` bottoms out in the same `service._invoke` the HTTP transport uses.
+Protocol faults map to JSON-RPC errors; tool-gate denials map to MCP `{content, isError: true}` results.
+stdio transport, SSE notifications, the `search_tools`/`describe_tool` meta-toolset, and MCP
+resources/prompts are deferred to later slices.
+
 **F23e (agent tooling — response shaping + a composite tool) — complete.** Two more ways to bound an
 agent's token cost. A `fields` list on `PageIn` projects each list-tool item to just the requested keys
 (`paging_io.project`, lenient — unknown keys absent, `None` returns the full item), applied by
