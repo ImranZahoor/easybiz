@@ -6,6 +6,17 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F21b (API conventions — error envelope) — complete.** Every error response is now a single envelope
+`{"detail", "code", "errors", "request_id"}` across both ninja planes (tenant `api` + `platform_api`) and
+the two kernel middlewares (`tenant.suspended` 403, `module.not_enabled` 404) that previously returned a
+bare `{"detail"}`. Codes come from Appendix E, defaulted by HTTP status (`easybiz/core/api/envelope.py`);
+`DomainError` gained an optional `code`. A ninja `ValidationError` handler turns request-body failures into
+`errors: [{field, code, message}]` (`code: validation.failed`). A new first-in-chain `RequestIDMiddleware`
+stamps `request.request_id` (an incoming `X-Request-ID`, validated against a short plain-charset allowlist,
+or a fresh `uuid4().hex`) and returns it as `X-Request-ID` on every response. Purely additive — `detail` is
+unchanged, no endpoint moved, no `/api/v1` yet. `Idempotency-Key`, optimistic concurrency, pagination
+`count`, OpenAPI hygiene, the `/api/v1` migration, and finer auth-401 codes remain later F21/F13 slices.
+
 **F23f (agent tooling — MCP wire server, streamable-HTTP) — complete.** The tool layer is now reachable
 over the Model Context Protocol at `POST /api/mcp` — a hand-rolled JSON-RPC 2.0 endpoint (no new deps)
 supporting `initialize`, `ping`, `tools/list`, and `tools/call`. A transport-free dispatch core

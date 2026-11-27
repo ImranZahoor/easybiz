@@ -2,7 +2,9 @@ import importlib
 import importlib.util
 
 from ninja import NinjaAPI
+from ninja.errors import AuthenticationError, HttpError, ValidationError
 
+from easybiz.core.api import envelope
 from easybiz.core.api.auth import router as auth_router
 from easybiz.core.api.core_routes import router as core_router
 from easybiz.core.api.mcp_routes import router as mcp_router
@@ -17,10 +19,33 @@ api.add_router("/tools", tools_router)
 api.add_router("/mcp", mcp_router)
 
 
+def _envelope(request, detail, status, *, code=None, errors=None):
+    body = envelope.build(
+        detail, status, code=code, request_id=getattr(request, "request_id", None), errors=errors
+    )
+    return api.create_response(request, body, status=status)
+
+
 @api.exception_handler(DomainError)
 def _on_domain_error(request, exc: DomainError):
     """Map any domain error to its HTTP status, so handlers need no try/except."""
-    return api.create_response(request, {"detail": str(exc)}, status=exc.status)
+    return _envelope(request, str(exc), exc.status, code=exc.code)
+
+
+@api.exception_handler(HttpError)
+def _on_http_error(request, exc: HttpError):
+    """ninja's HttpError (perm guard, login, write routes) through the same envelope."""
+    return _envelope(request, exc.message, exc.status_code)
+
+
+@api.exception_handler(ValidationError)
+def _on_validation_error(request, exc: ValidationError):
+    return _envelope(request, "validation failed", 422, errors=envelope.field_errors(exc))
+
+
+@api.exception_handler(AuthenticationError)
+def _on_auth_error(request, exc: AuthenticationError):
+    return _envelope(request, "authentication required", 401)
 
 
 def _mount_module_routers() -> None:
