@@ -56,6 +56,7 @@ MIDDLEWARE = [
     "django_tenants.middleware.main.TenantMainMiddleware",
     "easybiz.core.kernel.middleware.TenantStatusMiddleware",
     "easybiz.core.kernel.middleware.ModuleGateMiddleware",
+    "easybiz.core.idempotency.middleware.IdempotencyMiddleware",
     "django.middleware.common.CommonMiddleware",
 ]
 
