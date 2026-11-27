@@ -1,5 +1,5 @@
 from ninja import NinjaAPI
-from ninja.errors import AuthenticationError, ValidationError
+from ninja.errors import AuthenticationError, HttpError, ValidationError
 
 from easybiz.core.api import envelope
 from easybiz.core.errors import DomainError
@@ -48,6 +48,11 @@ def _on_weak_password(request, exc):
 @platform_api.exception_handler(DomainError)
 def _on_domain_error(request, exc: DomainError):
     return _envelope(request, str(exc), exc.status, code=exc.code)
+
+
+@platform_api.exception_handler(HttpError)
+def _on_http_error(request, exc: HttpError):
+    return _envelope(request, exc.message, exc.status_code)
 
 
 @platform_api.exception_handler(ValidationError)

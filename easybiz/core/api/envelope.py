@@ -19,7 +19,7 @@ def build(
     *,
     code: str | None = None,
     request_id: str | None = None,
-    errors: list | None = None,
+    errors: list[dict] | None = None,
 ) -> dict:
     """The error envelope: detail (human) + stable code + field errors + request id."""
     return {

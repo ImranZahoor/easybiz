@@ -94,6 +94,7 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 CORS_ALLOW_CREDENTIALS = False
+CORS_EXPOSE_HEADERS = ["X-Request-ID"]  # let cross-origin JS read the request id for tracing
 CORS_ALLOWED_ORIGINS = [o for o in os.environ.get("EASYBIZ_CORS_ORIGINS", "").split(",") if o]
 if DEBUG:
     CORS_ALLOWED_ORIGIN_REGEXES = [

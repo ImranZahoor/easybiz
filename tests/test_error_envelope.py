@@ -66,3 +66,30 @@ def test_domain_error_is_enveloped(synced, provision):
     assert r.status_code == 422  # duplicate name
     out = r.json()
     assert out["code"] == "validation.failed" and out["errors"] == [] and "request_id" in out
+
+
+def test_http_error_invalid_credentials_is_enveloped(synced, provision):
+    # the bad-password login raises ninja HttpError(401) — must flow through the envelope too
+    provision(slug="e4", modules=())
+    r = Client().post(
+        "/api/auth/login",
+        data={"email": "owner@e4.test", "password": "wrong-password"},
+        content_type="application/json",
+        HTTP_HOST="e4.localhost",
+    )
+    assert r.status_code == 401
+    body = r.json()
+    assert body["code"] == "auth.token_invalid" and body["errors"] == [] and "request_id" in body
+
+
+def test_platform_plane_error_is_enveloped(synced):
+    # a platform-plane bad login (HttpError 401) carries the envelope on the platform api too
+    r = Client().post(
+        "/api/platform/auth/login",
+        data={"email": "nobody@example.com", "password": "nope"},
+        content_type="application/json",
+        HTTP_HOST="localhost",
+    )
+    assert r.status_code == 401
+    body = r.json()
+    assert {"detail", "code", "errors", "request_id"} <= set(body) and body["code"]

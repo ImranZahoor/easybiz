@@ -2,7 +2,7 @@ import importlib
 import importlib.util
 
 from ninja import NinjaAPI
-from ninja.errors import AuthenticationError, ValidationError
+from ninja.errors import AuthenticationError, HttpError, ValidationError
 
 from easybiz.core.api import envelope
 from easybiz.core.api.auth import router as auth_router
@@ -19,31 +19,33 @@ api.add_router("/tools", tools_router)
 api.add_router("/mcp", mcp_router)
 
 
+def _envelope(request, detail, status, *, code=None, errors=None):
+    body = envelope.build(
+        detail, status, code=code, request_id=getattr(request, "request_id", None), errors=errors
+    )
+    return api.create_response(request, body, status=status)
+
+
 @api.exception_handler(DomainError)
 def _on_domain_error(request, exc: DomainError):
     """Map any domain error to its HTTP status, so handlers need no try/except."""
-    body = envelope.build(
-        str(exc), exc.status, code=exc.code, request_id=getattr(request, "request_id", None)
-    )
-    return api.create_response(request, body, status=exc.status)
+    return _envelope(request, str(exc), exc.status, code=exc.code)
+
+
+@api.exception_handler(HttpError)
+def _on_http_error(request, exc: HttpError):
+    """ninja's HttpError (perm guard, login, write routes) through the same envelope."""
+    return _envelope(request, exc.message, exc.status_code)
 
 
 @api.exception_handler(ValidationError)
 def _on_validation_error(request, exc: ValidationError):
-    body = envelope.build(
-        "validation failed",
-        422,
-        request_id=getattr(request, "request_id", None),
-        errors=envelope.field_errors(exc),
-    )
-    return api.create_response(request, body, status=422)
+    return _envelope(request, "validation failed", 422, errors=envelope.field_errors(exc))
 
 
 @api.exception_handler(AuthenticationError)
 def _on_auth_error(request, exc: AuthenticationError):
-    rid = getattr(request, "request_id", None)
-    body = envelope.build("authentication required", 401, request_id=rid)
-    return api.create_response(request, body, status=401)
+    return _envelope(request, "authentication required", 401)
 
 
 def _mount_module_routers() -> None:
