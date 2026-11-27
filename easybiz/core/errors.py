@@ -5,6 +5,7 @@ class DomainError(Exception):
     maps every DomainError to its status in one place (no per-handler try/except).
     """
 
-    def __init__(self, message: str, status: int) -> None:
+    def __init__(self, message: str, status: int, code: str | None = None) -> None:
         super().__init__(message)
         self.status = status
+        self.code = code
