@@ -5,30 +5,35 @@ from django.http import HttpResponse, JsonResponse
 from django_tenants.utils import get_public_schema_name
 
 from easybiz.core.api import envelope
+from easybiz.core.api.security import TenantJWTAuth
+from easybiz.core.iam import service as iam
 from easybiz.core.idempotency import service
+
+_MAX_KEY = 200  # the idem_key.key column width
 
 
 class IdempotencyMiddleware:
-    """Replay/guard keyed POSTs on the tenant plane; everything else passes through."""
+    """Replay/guard keyed POSTs by an authenticated caller on the tenant plane; else passthrough."""
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         key = request.headers.get("Idempotency-Key")
+        caller = self._caller(request) if key else ""
         if (
             request.method != "POST"
             or not key
+            or len(key) > _MAX_KEY
+            or not caller  # unauthenticated callers never engage idempotency (login stays uncached)
             or connection.schema_name == get_public_schema_name()
         ):
             return self.get_response(request)
 
         path = request.get_full_path()
-        req_hash = service.request_hash(
-            request.method, path, request.body, request.headers.get("Authorization", "")
-        )
+        req_hash = service.request_hash(request.method, path, request.body)
         rid = getattr(request, "request_id", None)
-        claim = service.claim(key, path, req_hash)
+        claim = service.claim(caller, key, path, req_hash)
 
         if claim.kind == service.REPLAY:
             resp = HttpResponse(
@@ -53,7 +58,29 @@ class IdempotencyMiddleware:
             )
             return JsonResponse(body, status=422)
 
-        response = self.get_response(request)
-        stored = "" if getattr(response, "streaming", False) else response.content.decode()
-        service.finalize(key, response.status_code, stored)
+        try:
+            response = self.get_response(request)
+        except Exception:
+            service.release(caller, key, req_hash)  # never strand the key on a handler crash
+            raise
+        try:
+            stored = None if getattr(response, "streaming", False) else response.content.decode()
+        except UnicodeDecodeError:
+            stored = None  # a non-text 2xx body is not cacheable here
+        if stored is None:
+            service.release(caller, key, req_hash)
+        else:
+            service.finalize(caller, key, req_hash, response.status_code, stored)
         return response
+
+    @staticmethod
+    def _caller(request) -> str:
+        """A stable principal id from the credential (like ToolPrincipalAuth); '' if unresolved."""
+        header = request.headers.get("Authorization", "")
+        if header.startswith("Bearer "):
+            user = TenantJWTAuth._user_from_token(request, header[7:])
+            return f"user:{user.id}" if user is not None else ""
+        if header.startswith("ApiKey "):
+            key = iam.authenticate_api_key(header[7:])
+            return f"key:{key.id}" if key is not None else ""
+        return ""

@@ -24,26 +24,25 @@ class Claim:
     body: str = ""
 
 
-def request_hash(method: str, path: str, body: bytes, auth_header: str) -> str:
-    """sha256 over method/path/credential/body — the credential blocks cross-caller replay."""
+def request_hash(method: str, path: str, body: bytes) -> str:
+    """sha256 over method/path/body — the payload fingerprint (caller scopes the row)."""
     h = hashlib.sha256()
     h.update(method.encode())
     h.update(b"\n")
     h.update(path.encode())
     h.update(b"\n")
-    h.update(auth_header.encode())
-    h.update(b"\n")
     h.update(body)
     return h.hexdigest()
 
 
-def claim(key: str, endpoint: str, request_hash: str) -> Claim:
-    """Own the key (insert), or decide replay/conflict/mismatch against the existing row."""
+def claim(caller: str, key: str, endpoint: str, request_hash: str) -> Claim:
+    """Own the (caller, key) row, or decide replay/conflict/mismatch against the existing one."""
     now = timezone.now()
     with transaction.atomic():
         try:
             with transaction.atomic():  # savepoint: a losing insert must not abort the outer tx
                 IdemKey.objects.create(
+                    caller=caller,
                     key=key,
                     endpoint=endpoint,
                     request_hash=request_hash,
@@ -53,7 +52,7 @@ def claim(key: str, endpoint: str, request_hash: str) -> Claim:
             return Claim(FRESH)
         except IntegrityError:
             pass
-        row = IdemKey.objects.select_for_update().get(key=key)
+        row = IdemKey.objects.select_for_update().get(caller=caller, key=key)
         if row.expires_at <= now:  # stale — reclaim it for this request
             row.endpoint = endpoint
             row.request_hash = request_hash
@@ -70,10 +69,19 @@ def claim(key: str, endpoint: str, request_hash: str) -> Claim:
         return Claim(CONFLICT)
 
 
-def finalize(key: str, response_status: int, body: str) -> None:
-    """Store a completed 2xx response; any other status releases the key for a retry."""
-    rows = IdemKey.objects.filter(key=key, status="in_progress")
+def finalize(caller: str, key: str, request_hash: str, response_status: int, body: str) -> None:
+    """Store a completed 2xx response on our own row; any other status releases the key."""
+    rows = IdemKey.objects.filter(
+        caller=caller, key=key, request_hash=request_hash, status="in_progress"
+    )
     if 200 <= response_status < 300:
         rows.update(status="completed", response_status=response_status, body=body)
     else:
         rows.delete()
+
+
+def release(caller: str, key: str, request_hash: str) -> None:
+    """Drop our in-progress row so the key is reusable (handler error or uncacheable body)."""
+    IdemKey.objects.filter(
+        caller=caller, key=key, request_hash=request_hash, status="in_progress"
+    ).delete()
