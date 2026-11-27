@@ -1,12 +1,3 @@
-"""Transport-free JSON-RPC 2.0 dispatch for the Model Context Protocol.
-
-One parsed message + a tool :class:`Principal` in, one JSON-RPC response dict
-out (or ``None`` for a notification). ``tools/list`` and ``tools/call`` delegate
-to the shared tool service, so the F23b gate and audit are inherited unchanged —
-this layer adds no tool logic and no new way to authorize. HTTP framing lives in
-the route; this module never touches the request.
-"""
-
 from __future__ import annotations
 
 import json
@@ -48,12 +39,7 @@ def tool_descriptor(tool: Tool) -> dict:
 
 
 def handle_message(message, principal) -> dict | None:
-    """Dispatch one JSON-RPC message. Returns a response dict, or None for a notification.
-
-    Protocol-level problems (bad shape, unknown method, bad params) become JSON-RPC
-    errors; a tool-gate denial from ``_invoke`` becomes an ``isError`` result, per the
-    MCP convention that tool failures are results, not protocol errors.
-    """
+    """Dispatch one JSON-RPC message to a response dict, or None for a notification."""
     if not isinstance(message, dict) or not isinstance(message.get("method"), str):
         mid = message.get("id") if isinstance(message, dict) else None
         return _error(mid, _INVALID_REQUEST, "invalid request")

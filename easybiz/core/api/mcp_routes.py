@@ -13,12 +13,7 @@ router = Router()
 
 @router.post("", auth=tool_principal)
 def rpc(request):
-    """A single JSON-RPC 2.0 message over streamable-HTTP MCP.
-
-    Auth (tenant JWT user or scoped agent key → Principal) and tenant resolution
-    are handled by ``tool_principal`` + the tenant middleware before we get here,
-    so the handshake itself is authenticated. The dispatch core enforces the gate.
-    """
+    """Handle one JSON-RPC 2.0 message over streamable-HTTP MCP."""
     try:
         message = json.loads(request.body or b"{}")
     except (ValueError, RecursionError):
