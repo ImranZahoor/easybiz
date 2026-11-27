@@ -148,6 +148,24 @@ def test_unauthenticated_login_is_not_cached(synced, provision):
         assert IdemKey.objects.count() == 0  # login response (with its token) is not persisted
 
 
+def test_secret_returning_endpoint_is_not_cached(synced, provision):
+    # POST /api/core/apikeys returns the raw secret → never stored in idem_key (no secret at rest)
+    token = _owner(provision, "i9")
+    r = Client().post(
+        "/api/core/apikeys",
+        data=json.dumps({"name": "svc", "permissions": ["core.audit.read"]}),
+        content_type="application/json",
+        HTTP_HOST="i9.localhost",
+        HTTP_AUTHORIZATION=f"Bearer {token}",
+        HTTP_IDEMPOTENCY_KEY="key-9",
+    )
+    assert r.status_code == 201 and r.json()["secret"]  # created, secret returned
+    from easybiz.core.idempotency.models import IdemKey
+
+    with tenant_context(Tenant.objects.get(slug="i9")):
+        assert IdemKey.objects.count() == 0  # the secret body was not persisted
+
+
 def test_platform_plane_passthrough(synced):
     # the public/platform schema has no idem_key table — the header must not make it touch one
     r = Client().post(

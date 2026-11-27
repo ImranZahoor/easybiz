@@ -11,6 +11,10 @@ from easybiz.core.idempotency import service
 
 _MAX_KEY = 200  # the idem_key.key column width
 
+# Endpoints whose 2xx body carries a secret skip idempotency entirely — caching would leave the
+# secret at rest in idem_key.body. (The op is not replay-safe to store here.)
+_NO_CACHE_PATHS = frozenset({"/api/core/apikeys"})
+
 
 class IdempotencyMiddleware:
     """Replay/guard keyed POSTs by an authenticated caller on the tenant plane; else passthrough."""
@@ -26,6 +30,7 @@ class IdempotencyMiddleware:
             or not key
             or len(key) > _MAX_KEY
             or not caller  # unauthenticated callers never engage idempotency (login stays uncached)
+            or request.path in _NO_CACHE_PATHS  # secret-returning endpoints are never cached
             or connection.schema_name == get_public_schema_name()
         ):
             return self.get_response(request)

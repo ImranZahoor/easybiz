@@ -15,7 +15,8 @@ true`), returns 409 `resource.conflict` while a duplicate is still in flight (on
 with a different payload. Each row is **scoped to a stable caller** (user/key id, resolved in the
 middleware), so one user can neither replay another's response nor squat another's key, and a legitimate
 retry after a token refresh still replays. Idempotency engages only for an authenticated caller — the
-unauthenticated login POST is never cached. Only 2xx responses are stored; any error (or a non-text body,
+unauthenticated login POST is never cached, and secret-returning endpoints (e.g. API-key creation) are
+excluded so no secret is stored at rest. Only 2xx responses are stored; any error (or a non-text body,
 or a handler crash) releases the key. Absent header, non-`POST`, and the public/platform schema pass
 straight through. Expired-row cleanup (a job, F11), per-key rate limiting, `PUT`/`PATCH`/`DELETE`, and the
 `/api/v1` move remain later slices.
