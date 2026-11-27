@@ -50,6 +50,7 @@ TENANT_APPS = [
 INSTALLED_APPS = list(SHARED_APPS) + [a for a in TENANT_APPS if a not in SHARED_APPS]
 
 MIDDLEWARE = [
+    "easybiz.core.api.middleware.RequestIDMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
     "easybiz.core.kernel.middleware.TenantStatusMiddleware",

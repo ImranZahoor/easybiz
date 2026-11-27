@@ -4,6 +4,7 @@ import re
 
 from django.http import JsonResponse
 
+from easybiz.core.api import envelope
 from easybiz.core.kernel import state
 from easybiz.core.kernel.registry import registry
 
@@ -19,7 +20,13 @@ class TenantStatusMiddleware:
     def __call__(self, request):
         tenant = getattr(request, "tenant", None)
         if tenant is not None and tenant.is_active is False:
-            return JsonResponse({"detail": "This tenant is suspended"}, status=403)
+            body = envelope.build(
+                "This tenant is suspended",
+                403,
+                code="tenant.suspended",
+                request_id=getattr(request, "request_id", None),
+            )
+            return JsonResponse(body, status=403)
         return self.get_response(request)
 
 
@@ -34,10 +41,13 @@ class ModuleGateMiddleware:
         if match:
             segment = match.group(1)
             if self._route_is_gated(segment, getattr(request, "tenant", None)):
-                return JsonResponse(
-                    {"detail": f"Module '{segment}' is not enabled for this tenant"},
-                    status=404,
+                body = envelope.build(
+                    f"Module '{segment}' is not enabled for this tenant",
+                    404,
+                    code="module.not_enabled",
+                    request_id=getattr(request, "request_id", None),
                 )
+                return JsonResponse(body, status=404)
         return self.get_response(request)
 
     @staticmethod
