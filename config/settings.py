@@ -45,6 +45,7 @@ TENANT_APPS = [
     "easybiz.core.iam",
     "easybiz.core.audit",
     "easybiz.core.events",
+    "easybiz.core.idempotency",
     *EASYBIZ_MODULE_PACKAGES,
 ]
 INSTALLED_APPS = list(SHARED_APPS) + [a for a in TENANT_APPS if a not in SHARED_APPS]
@@ -55,6 +56,7 @@ MIDDLEWARE = [
     "django_tenants.middleware.main.TenantMainMiddleware",
     "easybiz.core.kernel.middleware.TenantStatusMiddleware",
     "easybiz.core.kernel.middleware.ModuleGateMiddleware",
+    "easybiz.core.idempotency.middleware.IdempotencyMiddleware",
     "django.middleware.common.CommonMiddleware",
 ]
 

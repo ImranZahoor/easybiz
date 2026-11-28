@@ -6,6 +6,21 @@ to the spec in [`ERP-CORE-SPEC.md`](ERP-CORE-SPEC.md).
 
 ## Status
 
+**F21c (API conventions — Idempotency-Key) — complete.** A client can now make a tenant-plane `POST`
+safely retryable by sending an `Idempotency-Key` header. A per-tenant `idem_key` table
+(`easybiz.core.idempotency`) records each keyed request; `IdempotencyMiddleware` (after the tenant/module
+middlewares) replays the stored response on a same-key/same-payload retry (with `Idempotency-Replayed:
+true`), returns 409 `resource.conflict` while a duplicate is still in flight (one execution, guarded by a unique
+`(caller, key)` row + `select_for_update`), and 422 `idempotency.payload_mismatch` when the key is reused
+with a different payload. Each row is **scoped to a stable caller** (user/key id, resolved in the
+middleware), so one user can neither replay another's response nor squat another's key, and a legitimate
+retry after a token refresh still replays. Idempotency engages only for an authenticated caller — the
+unauthenticated login POST is never cached, and secret-returning endpoints (e.g. API-key creation) are
+excluded so no secret is stored at rest. Only 2xx responses are stored; any error (or a non-text body,
+or a handler crash) releases the key. Absent header, non-`POST`, and the public/platform schema pass
+straight through. Expired-row cleanup (a job, F11), per-key rate limiting, `PUT`/`PATCH`/`DELETE`, and the
+`/api/v1` move remain later slices.
+
 **F21b (API conventions — error envelope) — complete.** Every error response is now a single envelope
 `{"detail", "code", "errors", "request_id"}` across both ninja planes (tenant `api` + `platform_api`) and
 the two kernel middlewares (`tenant.suspended` 403, `module.not_enabled` 404) that previously returned a
